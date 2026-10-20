@@ -1,0 +1,13 @@
+Title: Modular kitchen
+Area: Lake Road
+Size: L-shape, 11 ft
+Days: 18
+Finished: Aug 2026
+Type: Kitchens
+About: An L-shaped kitchen with soft-close drawers, tall storage and a stone counter.
+Sample: yes
+
+Price:
+Base and wall units = 122000
+Soft-close hardware = 38000
+Counter and backsplash = 30000

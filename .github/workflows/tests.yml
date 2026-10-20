@@ -1,0 +1,24 @@
+# Runs all the automated tests for changes to the website's code: on pull requests, or by hand from
+# the Actions tab (Tests > Run workflow). It never runs for normal photo uploads, so it can't hold them up.
+name: Tests
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      - run: npm ci
+      - name: Unit tests
+        run: npm test
+      - name: Install test browsers
+        run: npx playwright install --with-deps chromium firefox webkit
+      - name: Browser tests (Chrome, Firefox, Safari; laptop, phone, tablet)
+        run: npm run test:e2e

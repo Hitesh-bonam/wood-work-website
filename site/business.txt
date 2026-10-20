@@ -1,0 +1,28 @@
+# Your business details. Change the text after each colon, then save the file.
+# Lines starting with # are notes for you and are not shown on the website.
+
+Business name: Your Woodworks
+Tagline: Woodwork, painting and repairs, done right
+
+# Write numbers with the country code (91 is India).
+Phone: +91 00000 00000
+WhatsApp: 91 00000 00000
+Email:
+
+City: Your City
+Areas: Green Park, Lake Road, Hill View, River Side
+Hours: Mon to Sat, 9 am to 7 pm. Sunday by appointment.
+# Paste a Google Maps link, or just write your address.
+Map:
+
+# Change these to your real numbers (leave empty to hide them).
+Years: 12
+Homes done: 180+
+Warranty: 5-year warranty on woodwork
+
+About: We are a family-run team of carpenters and painters. We build and finish everything ourselves, so the quality stays the same from the first board to the last coat of paint.
+
+# Optional links (leave empty to hide).
+Instagram:
+Facebook:
+YouTube:

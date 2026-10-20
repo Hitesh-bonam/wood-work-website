@@ -1,0 +1,123 @@
+/* Upload page (admin/). It uses the website's styles (app.css) plus these. Everything is sized for a thumb:
+   buttons and choices are at least 44 px tall, and text boxes use 16 px text so phones don't zoom in. */
+body.page-admin { padding-bottom: env(safe-area-inset-bottom, 0px); }
+.up { max-width: 680px; padding-top: 22px; padding-bottom: 48px; }
+.up h1 { font-size: clamp(1.6rem, 6vw, 2.2rem); }
+.up-lead { margin-top: 6px; color: var(--ink-2); }
+.up .card h2 { font-size: 1.2rem; margin-bottom: 12px; }
+.up .card > p + p, .up .card > p + .field { margin-top: 12px; }
+
+.up-alert {
+  margin: 16px 0 0;
+  padding: 14px 16px;
+  border-radius: 12px;
+  background: #fff3f0;
+  border: 2px solid #a12b1d;
+  color: #5a160d;
+  font-weight: 600;
+  white-space: pre-line;
+}
+.up .err { white-space: pre-line; }
+.up-status { margin-top: 10px; color: var(--ink-2); font-weight: 600; }
+.up-status:empty { margin: 0; }
+.up-loading { margin-top: 18px; }
+.up-loading .btn { margin-top: 12px; }
+
+.up input[type="text"], .up input[type="password"], .up input[type="url"], .up textarea {
+  display: block;
+  width: 100%;
+  min-height: 48px;
+  padding: 10px 12px;
+  border: 1px solid #cbbfae;
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit;
+  font-size: 1rem;
+}
+.up textarea { min-height: 96px; line-height: 1.45; resize: vertical; }
+.up input:disabled, .up textarea:disabled, .up select:disabled { background: var(--wood-50); color: var(--ink-3); }
+.up .field + .field { margin-top: 14px; }
+.up-wide { width: 100%; margin-top: 16px; }
+
+/* 2. Chapters */
+.up-chapters { margin: 0; padding: 0; border: 0; min-width: 0; }
+.up-chips { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.up-chips .tier span { display: flex; align-items: center; justify-content: center; min-height: 48px; padding: 8px 10px; line-height: 1.25; }
+#up-custom-field, #up-chapter-hint { margin-top: 12px; }
+
+/* 3. Photos */
+.up-pick { display: grid; gap: 10px; }
+.up-pick-btn { position: relative; width: 100%; }
+.up-pick-btn:focus-within { outline: 3px solid var(--focus); outline-offset: 2px; }
+.up-file { position: absolute; left: 0; top: 0; width: 1px; height: 1px; opacity: 0; overflow: hidden; }
+.up-pick + .hint { margin-top: 10px; }
+.up-photos { margin: 6px 0 0; padding: 0; list-style: none; }
+.up-photo { display: grid; grid-template-columns: 72px minmax(0, 1fr); gap: 10px 12px; padding: 14px 0; border-top: 1px solid var(--line); }
+.up-photo:first-child { margin-top: 8px; }
+.up-thumb-box { display: block; width: 72px; height: 72px; border-radius: 10px; overflow: hidden; background: var(--wood-100); }
+.up-thumb { width: 100%; height: 100%; object-fit: cover; }
+.up-photo-body { min-width: 0; }
+.up-photo-body label { display: block; margin-bottom: 4px; font-weight: 600; font-size: 0.92rem; }
+.up-photo-state { margin-top: 6px; color: var(--ink-2); font-size: 0.9rem; }
+.up-warn { color: #8a4b00; }
+.up-photo-actions { grid-column: 1 / -1; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; }
+.up-cover { display: inline-flex; align-items: center; gap: 10px; min-height: 44px; padding-right: 8px; font-weight: 600; cursor: pointer; }
+.up-cover input { width: 22px; height: 22px; margin: 0; accent-color: var(--wood); }
+.up-remove { margin-left: auto; }
+
+/* 4. Details */
+.up-details > summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  cursor: pointer;
+  list-style: none;
+}
+.up-details > summary::-webkit-details-marker { display: none; }
+.up-details > summary::after {
+  content: "";
+  flex: none;
+  width: 10px;
+  height: 10px;
+  margin: 0 6px 4px auto;
+  border-right: 2px solid var(--ink-2);
+  border-bottom: 2px solid var(--ink-2);
+  transform: rotate(45deg);
+}
+.up-details[open] > summary::after { margin-bottom: -4px; transform: rotate(-135deg); }
+.up .up-details > summary h2 { margin: 0; }
+.up-opt { font-family: var(--font); font-weight: 500; font-size: 0.9rem; color: var(--ink-3); }
+.up-details[open] > summary { margin-bottom: 8px; }
+.up-fields { margin-top: 14px; }
+
+/* Publish, progress and done */
+.up-send { margin-top: 16px; }
+.up-send .hint { text-align: center; }
+.up-send .err { margin-bottom: 4px; }
+.up progress { display: block; width: 100%; height: 14px; margin-top: 4px; accent-color: var(--wood); }
+.up-done:focus { outline: none; }
+.up-done-btns { margin-top: 16px; }
+.up-foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 28px;
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
+  color: var(--ink-2);
+  font-size: 0.92rem;
+}
+.up-foot strong { color: var(--ink); }
+
+@media (min-width: 480px) {
+  .up-chips { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .up-pick { grid-template-columns: 1fr 1fr; }
+}
+@media (min-width: 640px) {
+  .up-photo { grid-template-columns: 96px minmax(0, 1fr); }
+  .up-thumb-box { width: 96px; height: 96px; }
+}

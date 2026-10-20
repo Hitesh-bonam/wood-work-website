@@ -1,0 +1,28 @@
+{
+  "name": "woodwork-website",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Showcase website for a woodwork business. Every folder in projects/ becomes a project on the website.",
+  "scripts": {
+    "dev": "node src/dev.mjs",
+    "build": "node src/build-cli.mjs",
+    "check": "node src/check.mjs",
+    "clean-photos": "node src/clean-photos.mjs",
+    "samples": "node scripts/make-samples.mjs",
+    "test": "node --test \"tests/unit/*.test.mjs\"",
+    "test:e2e": "playwright test",
+    "test:all": "npm test && npm run test:e2e",
+    "prepare": "node src/setup-hooks.mjs"
+  },
+  "engines": {
+    "node": ">=20.9"
+  },
+  "dependencies": {
+    "sharp": "^0.35.5"
+  },
+  "devDependencies": {
+    "@axe-core/playwright": "^4.14.0",
+    "@playwright/test": "^1.64.1"
+  }
+}

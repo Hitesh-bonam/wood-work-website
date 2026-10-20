@@ -1,0 +1,26 @@
+# HOW TO USE THIS TEMPLATE
+# 1. Copy this whole "_template" folder and rename the copy with the next number, like "project-5".
+# 2. Put photos in the folders below. Leave any folder empty and that part is simply not shown.
+#      before / after   photos with the same name in both folders become a before/after slider
+#      woodwork, painting, repairs, team, quality, materials
+#      You can also make your own folder, like "kitchen" or "pooja room". It becomes its own chapter.
+# 3. Photo names become captions: "01-master-wardrobe.jpg" shows as "Master wardrobe".
+#    Phone names like IMG_2041.jpg are fine too; they just show no caption.
+# 4. Fill in the details below (everything is optional). Lines starting with # are notes.
+
+Title:
+Area:
+Size:
+Days:
+Finished:
+Type:
+About:
+
+Review:
+Review by:
+Video:
+
+# Price is optional. One item per line, like:   Wardrobe = 85000
+# Leave this empty to show no price for this project.
+# A line like   Note: GST extra   is shown under the price.
+Price:

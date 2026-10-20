@@ -1,0 +1,13 @@
+Title: Bedroom wardrobes
+Area: River Side
+Size: 2 rooms, 9 ft each
+Days: 12
+Finished: Aug 2026
+Type: Wardrobes
+About: Floor-to-ceiling wardrobes with lofts for two bedrooms.
+Sample: yes
+
+Price:
+Master bedroom wardrobe = 82000
+Kids room wardrobe = 64000
+Lofts above both = 22000

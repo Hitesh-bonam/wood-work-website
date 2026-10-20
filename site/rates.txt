@@ -1,0 +1,12 @@
+# Your rate card for the Pricing page.
+# One service per line:   Service = standard price / premium price per unit
+# Leave out the premium price if you don't offer it.
+# For work you price after a visit, write any text, for example:   Repairs = Visit ₹500, then quoted
+
+Rates as of: Oct 2026
+
+Wardrobes = 1200 / 1700 per sq ft
+Modular kitchen = 1500 / 2100 per sq ft
+TV unit = 1100 / 1500 per sq ft
+Painting = 18 / 26 per sq ft
+Repairs = Visit ₹500, then quoted

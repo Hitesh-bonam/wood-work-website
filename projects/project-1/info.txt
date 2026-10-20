@@ -1,0 +1,13 @@
+Title: Repaint and repairs
+Area: Hill View
+Size: 2BHK, 1,100 sq ft
+Days: 9
+Finished: Jul 2026
+Type: Painting, Repairs
+About: Damp walls treated, cracks filled and the whole home repainted in two coats.
+Sample: yes
+
+Price:
+Wall repairs and putty = 18000
+Painting, 2 coats = 39000
+Door polish = 8000

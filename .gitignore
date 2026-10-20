@@ -1,0 +1,35 @@
+node_modules/
+dist/
+.cache/
+test-results/
+playwright-report/
+tests/.tmp/
+*.cleaning.tmp
+tests/.last-run.txt
+
+# Files the website can't use are never uploaded: videos go on YouTube, and iPhone HEIC photos
+# must be saved as JPG first. The preview window tells you about any it finds.
+projects/**/*.mp4
+projects/**/*.MP4
+projects/**/*.mov
+projects/**/*.MOV
+projects/**/*.avi
+projects/**/*.AVI
+projects/**/*.mkv
+projects/**/*.3gp
+projects/**/*.webm
+projects/**/*.m4v
+projects/**/*.wmv
+projects/**/*.heic
+projects/**/*.HEIC
+projects/**/*.heif
+projects/**/*.HEIF
+site/**/*.mp4
+site/**/*.MP4
+site/**/*.mov
+site/**/*.MOV
+site/**/*.heic
+site/**/*.HEIC
+Thumbs.db
+desktop.ini
+.DS_Store

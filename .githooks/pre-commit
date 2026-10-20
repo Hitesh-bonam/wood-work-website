@@ -1,0 +1,8 @@
+#!/bin/sh
+# Before every commit: tidy new photos (remove the GPS location, turn upright, shrink to web size).
+if ! command -v node >/dev/null 2>&1; then
+  echo "Node.js was not found, so photos could not be tidied before saving."
+  echo "Install Node.js from https://nodejs.org and try again."
+  exit 1
+fi
+exec node src/clean-photos.mjs --staged
