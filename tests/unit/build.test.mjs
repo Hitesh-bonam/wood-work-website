@@ -4,7 +4,7 @@ import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import sharp from 'sharp';
-import { build } from '../../src/build.mjs';
+import { build, sizeReport } from '../../src/build.mjs';
 import { checkSite } from '../../src/check.mjs';
 import { makeFixture, writePhoto, writeText, FIXTURE_BASE } from '../helpers/fixture.mjs';
 
@@ -176,4 +176,14 @@ test('the preview server answers strange addresses without crashing', async () =
   } finally {
     server.close();
   }
+});
+
+test('the build says how full the website and the photos in the repository are', () => {
+  assert.ok(result.photoBytes > 0, 'the photos in projects/ and site/ are counted');
+  const quiet = sizeReport(300 * 1024 ** 2, 500 * 1024 ** 2);
+  assert.match(quiet.text, /Website size: 300 MB of 1,024 MB \(29% of the free GitHub space\)\. Photos in the repository: 500 MB of about 1,024 MB \(49%\)\./);
+  assert.equal(quiet.warning, '');
+  assert.match(sizeReport(500 * 1024 ** 2, 900 * 1024 ** 2).warning, /^The photos in the repository are getting close to the 1 GB free limit/);
+  assert.match(sizeReport(900 * 1024 ** 2, 500 * 1024 ** 2).warning, /^The website is getting close/);
+  assert.match(sizeReport(1024 * 200, 0).text, /Website size: 0\.2 MB .*\(<1% of the free GitHub space\).*0\.0 MB/);
 });

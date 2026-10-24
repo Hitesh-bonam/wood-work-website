@@ -607,25 +607,117 @@
       const left = link.offsetLeft - (inner.clientWidth - link.offsetWidth) / 2;
       inner.scrollTo({ left: Math.max(0, left), behavior: reduceMotion ? 'auto' : 'smooth' });
     };
-    // The chapter whose title has passed 40% of the screen height is the one being read.
+    // The chapter being read is the last one whose title has passed the bottom of this menu once the
+    // menu is stuck to the top of the screen (the same on every screen height). At the very end of the
+    // page, the last chapter on screen wins.
+    // Phones report window.innerHeight differently while the address bar moves; the page's own
+    // scrolling box gives the same numbers everywhere.
+    const scroller = () => document.scrollingElement || document.documentElement;
+    const atEnd = () => window.scrollY >= scroller().scrollHeight - scroller().clientHeight - 4;
     const update = () => {
-      const line = window.innerHeight * 0.4;
+      const stuckTop = parseFloat(getComputedStyle(chapterNav).top) || 0;
+      const line = stuckTop + chapterNav.offsetHeight + 24;
+      const end = window.scrollY > 0 && atEnd();
+      const screenHeight = scroller().clientHeight;
       let found = null;
       sections.forEach((section, i) => {
-        if (section && section.getBoundingClientRect().top <= line) found = links[i];
+        if (!section) return;
+        const top = section.getBoundingClientRect().top;
+        if (top <= line || (end && top < screenHeight)) found = links[i];
       });
       activate(found);
     };
     let ticking = false;
-    window.addEventListener('scroll', () => {
+    const updateSoon = () => {
       if (ticking) return;
       ticking = true;
       requestAnimationFrame(() => {
         ticking = false;
         update();
       });
+    };
+    // A tapped chapter stays highlighted while the page glides to it and once it is there, even when the
+    // page is too short for that chapter to reach the top. The highlight follows the page again as soon
+    // as the visitor scrolls by themselves.
+    // `target` is where the page stops for the tap: the chapter's title just under this menu, or the end
+    // of the page. A glide only ever gets closer to it, however long a slow phone pauses on the way; a
+    // move away from it is the visitor scrolling.
+    let tapped = null;
+    let gliding = false;
+    let target = 0;
+    let toEnd = false; // the tap goes to the end of the page, which may be a little further than measured
+    let gap = 0; // how far the glide still has to go
+    let quiet = 0;
+    const follow = () => {
+      clearTimeout(quiet);
+      tapped = null;
+      gliding = false;
+      updateSoon();
+    };
+    // A glide that stops short of `target` (the page changed meanwhile) rests where it stopped.
+    const restLater = () => {
+      clearTimeout(quiet);
+      quiet = setTimeout(() => {
+        gliding = false;
+        target = window.scrollY;
+      }, 3000);
+    };
+    links.forEach((link) => link.addEventListener('click', () => {
+      const section = sections[links.indexOf(link)];
+      const margin = section ? parseFloat(getComputedStyle(section).scrollMarginTop) || 0 : 0;
+      const max = scroller().scrollHeight - scroller().clientHeight;
+      const wanted = section ? window.scrollY + section.getBoundingClientRect().top - margin : window.scrollY;
+      target = Math.max(0, Math.min(max, wanted));
+      toEnd = wanted >= max - 1;
+      tapped = link;
+      gliding = true;
+      gap = Math.abs(window.scrollY - target);
+      activate(link);
+      restLater();
+    }));
+    window.addEventListener('scroll', () => {
+      if (!tapped) {
+        updateSoon();
+        return;
+      }
+      if (toEnd && window.scrollY > target) target = window.scrollY;
+      const left = Math.abs(window.scrollY - target);
+      if (gliding && left <= gap + 4) {
+        gap = Math.min(gap, left);
+        if (left < 4) {
+          clearTimeout(quiet);
+          gliding = false;
+        } else {
+          restLater();
+        }
+        return;
+      }
+      if (!gliding && left < 4) return;
+      follow();
     }, { passive: true });
-    window.addEventListener('resize', update);
+    // Scrolling by hand during the glide stops it there; the highlight follows the page from then on.
+    // (Once the page rests, any move away from that spot does the same, above.)
+    const SCROLL_KEYS = ['ArrowUp', 'ArrowDown', 'PageUp', 'PageDown', 'Home', 'End', ' ', 'Spacebar'];
+    window.addEventListener('wheel', (e) => {
+      if (gliding && Math.abs(e.deltaY) > Math.abs(e.deltaX)) follow();
+    }, { passive: true, capture: true });
+    window.addEventListener('keydown', (e) => {
+      if (gliding && SCROLL_KEYS.includes(e.key)) follow();
+    }, { capture: true });
+    let touchAt = null;
+    window.addEventListener('touchstart', (e) => {
+      touchAt = e.touches.length === 1 ? { x: e.touches[0].clientX, y: e.touches[0].clientY } : null;
+    }, { passive: true, capture: true });
+    window.addEventListener('touchmove', (e) => {
+      // A finger moving this menu sideways doesn't move the page.
+      if (!gliding || !touchAt || !e.touches.length) return;
+      const dx = Math.abs(e.touches[0].clientX - touchAt.x);
+      const dy = Math.abs(e.touches[0].clientY - touchAt.y);
+      if (dy > 8 && dy > dx) follow();
+    }, { passive: true, capture: true });
+    window.addEventListener('resize', () => {
+      if (!tapped) updateSoon();
+    });
     update();
   }
 

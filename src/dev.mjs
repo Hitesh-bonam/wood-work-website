@@ -75,6 +75,7 @@ let building = false;
 let queued = false;
 let settleTimer = null;
 let shownWarnings = new Set();
+let shownSizeWarning = '';
 /** Photos the preview just tidied itself; their change events must not trigger another refresh. */
 const ownChanges = new Map();
 const changeKey = (file) => {
@@ -102,7 +103,11 @@ async function rebuild() {
     shownWarnings = new Set(result.warnings);
     notes = result.warnings;
     for (const warning of fresh) log(`  ! ${warning}`);
-    log(`[${new Date().toLocaleTimeString()}] Updated: ${result.projects} projects, ${result.photos} photos${result.cleaned ? `, tidied ${result.cleaned} new photos` : ''}. ${sizeReport(result.bytes).text}`);
+    const size = sizeReport(result.bytes, result.photoBytes);
+    log(`[${new Date().toLocaleTimeString()}] Updated: ${result.projects} projects, ${result.photos} photos${result.cleaned ? `, tidied ${result.cleaned} new photos` : ''}. ${size.text}`);
+    // Said once, not after every change.
+    if (size.warning && size.warning !== shownSizeWarning) log(`  ! ${size.warning}`);
+    shownSizeWarning = size.warning;
     broadcast('reload');
     clearTimeout(settleTimer);
     if (result.deferred) settleTimer = setTimeout(rebuild, 2500);

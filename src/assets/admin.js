@@ -2,7 +2,9 @@
    Photos are redrawn smaller right here in the browser, which also removes their hidden data (GPS location,
    camera details), before anything is sent. Then everything is saved to GitHub as one commit.
    The GitHub key stays on this phone (localStorage) and is only ever sent to api.github.com.
-   The rules (names, info.txt, the commit) are in admin-core.js. */
+   Photos waiting to be sent, their captions and the typed details are kept on the phone (IndexedDB) until
+   they are published, so a page the phone closes (low memory while the camera is open, switching apps)
+   comes back as it was. The rules (names, info.txt, the commit) are in admin-core.js. */
 (() => {
   'use strict';
 
@@ -49,6 +51,73 @@
     },
   };
 
+  // The last save while it isn't certain that it arrived (see core.publish). This tab keeps it even when
+  // the page reloads; the store of waiting photos below keeps it too.
+  const memoName = `woodwork-upload-memo:${repo}`;
+  const savedMemo = {
+    get() {
+      try {
+        const memo = JSON.parse(window.sessionStorage.getItem(memoName) || 'null');
+        return memo && memo.commit ? memo : null;
+      } catch (err) {
+        return null;
+      }
+    },
+    set(memo) {
+      try {
+        if (memo && memo.commit) window.sessionStorage.setItem(memoName, JSON.stringify(memo));
+        else window.sessionStorage.removeItem(memoName);
+      } catch (err) {
+        // This browser can't keep it here; the store of waiting photos still does.
+      }
+    },
+  };
+
+  /* Photos waiting to be sent, kept on this phone (IndexedDB). Where a browser can't store them (some
+     private modes), every call quietly does nothing and the page works as before. */
+  const kept = (() => {
+    const prefix = `${repo}|`;
+    let opening = null;
+    const open = () => {
+      if (!opening) {
+        opening = new Promise((resolve) => {
+          try {
+            const request = window.indexedDB.open('woodwork-upload', 1);
+            request.onupgradeneeded = () => request.result.createObjectStore('items');
+            request.onsuccess = () => resolve(request.result);
+            request.onerror = () => resolve(null);
+            request.onblocked = () => resolve(null);
+          } catch (err) {
+            resolve(null);
+          }
+        });
+      }
+      return opening;
+    };
+    const run = async (mode, work) => {
+      const db = await open();
+      if (!db) return null;
+      return new Promise((resolve) => {
+        try {
+          const tx = db.transaction('items', mode);
+          const request = work(tx.objectStore('items'));
+          tx.oncomplete = () => resolve(request ? request.result : true);
+          tx.onerror = () => resolve(null);
+          tx.onabort = () => resolve(null);
+        } catch (err) {
+          resolve(null);
+        }
+      });
+    };
+    const mine = () => window.IDBKeyRange.bound(prefix, `${prefix}￿`);
+    return {
+      put: (name, value) => run('readwrite', (store) => store.put(value, prefix + name)),
+      remove: (name) => run('readwrite', (store) => store.delete(prefix + name)),
+      all: async () => (await run('readonly', (store) => store.getAll(mine()))) || [],
+      clear: () => run('readwrite', (store) => store.delete(mine())),
+    };
+  })();
+
   const el = {
     alert: $('up-alert'),
     loadingText: $('up-loading-text'),
@@ -57,6 +126,10 @@
     connectBtn: $('up-connect-btn'),
     key: $('up-key'),
     keyErr: $('up-key-err'),
+    keyAgain: $('up-key-again'),
+    keyAgainText: $('up-key-again-text'),
+    keyRetry: $('up-key-retry'),
+    keyNew: $('up-key-new'),
     form: $('up-form'),
     project: $('up-project'),
     chips: $('up-chips'),
@@ -67,11 +140,14 @@
     gallery: $('up-gallery'),
     camera: $('up-camera'),
     photoStatus: $('up-photo-status'),
+    restored: $('up-restored'),
+    clear: $('up-clear'),
     photoErr: $('up-photo-err'),
     list: $('up-photos'),
     captions: $('up-captions'),
     details: $('up-details'),
     detailsStatus: $('up-details-status'),
+    fieldsBox: $('up-fields'),
     fields: Array.from(d.querySelectorAll('[data-field]')),
     price: $('up-f-price'),
     priceErr: $('up-f-price-err'),
@@ -93,13 +169,15 @@
     tree: null, // projects on GitHub, from core.listProjects
     original: {}, // the details as loaded, to see what the owner changed
     detailsReady: true,
-    photos: [], // { id, name, type, file, blob, ext, thumb, caption, cover, sha, ready, removed, row }
-    memo: {}, // the last save, while it isn't certain that it arrived (see core.publish)
+    pendingEdits: null, // typed details waiting for their project's details to load
+    photos: [], // { id, key, name, type, blob, ext, sha, uploaded, thumb, caption, cover, ready, removed, row }
+    memo: savedMemo.get() || {}, // the last save, while it isn't certain that it arrived (see core.publish)
     problems: [],
     queue: Promise.resolve(),
     preparing: 0,
     busy: false,
     formStarted: false,
+    draftReady: false, // true once what the phone kept has been put back, so it is never overwritten by an empty page
     nextId: 1,
   };
 
@@ -110,7 +188,7 @@
     SCREENS.forEach((screen) => {
       $(screen).hidden = screen !== id;
     });
-    el.foot.hidden = !state.client || id === 'up-connect' || id === 'up-norepo';
+    el.foot.hidden = id === 'up-norepo' || !savedKey.get();
     if (id === 'up-form') state.formStarted = true;
   }
   function setText(node, text) {
@@ -121,23 +199,121 @@
   const keyError = (text) => setText(el.keyErr, text);
   const sendError = (text) => setText(el.sendErr, text);
 
+  /* ---------- Keeping the page on this phone ---------- */
+
+  let saveTimer = 0;
+  /** Writes what is on the page (captions, choices, typed details, the last save) to this phone. */
+  function saveDraft(now) {
+    clearTimeout(saveTimer);
+    if (!state.draftReady) return Promise.resolve();
+    if (!now) {
+      saveTimer = setTimeout(() => saveDraft(true), 300);
+      return Promise.resolve();
+    }
+    savedMemo.set(state.memo);
+    const checked = el.chips.querySelector('input[name="chapter"]:checked');
+    const draft = {
+      kind: 'draft',
+      project: el.project.value,
+      chapter: checked ? checked.value : '',
+      custom: el.custom.value,
+      edits: state.detailsReady ? detailChanges() : state.pendingEdits || {},
+      photos: state.photos.filter((p) => p.ready).map((p) => ({ id: p.id, caption: p.caption, cover: p.cover })),
+      memo: state.memo && state.memo.commit ? state.memo : null,
+    };
+    if (!draft.photos.length && !Object.keys(draft.edits).length && !draft.memo) return kept.remove('draft');
+    return kept.put('draft', draft);
+  }
+  // A phone may close the page soon after it is hidden (switching to the camera or another app).
+  d.addEventListener('visibilitychange', () => {
+    if (d.visibilityState === 'hidden') saveDraft(true);
+  });
+
+  /** Puts back what was on the page when the phone closed it. Returns true when there was something. */
+  async function restoreDraft() {
+    const items = await kept.all();
+    const draft = items.find((item) => item && item.kind === 'draft') || { photos: [], edits: {} };
+    const records = items.filter((item) => item && item.kind === 'photo');
+    const memo = savedMemo.get() || draft.memo || null;
+    if (memo) state.memo = memo;
+    const edits = draft.edits || {};
+    if (!records.length && !Object.keys(edits).length) return false;
+
+    // Photos kept without a list (the page closed at that very moment) go to a new project, as on a fresh page.
+    const target = draft.project == null ? core.NEW : draft.project;
+    const known = target === core.NEW || state.tree.projects.some((p) => p.folder === target);
+    fillProjects(known ? target : '', { choose: !known });
+    await chooseProject(known ? edits : null);
+    const radio = Array.from(el.chips.querySelectorAll('input[name="chapter"]')).find((input) => input.value === draft.chapter);
+    if (radio) radio.checked = true;
+    el.custom.value = draft.custom || '';
+
+    const order = new Map((draft.photos || []).map((entry, at) => [entry.id, Object.assign({ at }, entry)]));
+    const place = (record) => (order.has(record.id) ? order.get(record.id).at : 1e6 + record.id);
+    const project = currentProject();
+    records.sort((a, b) => place(a) - place(b)).forEach((record) => {
+      const entry = order.get(record.id) || {};
+      const photo = {
+        id: record.id,
+        key: `kept|${record.id}`,
+        name: record.name,
+        type: record.type,
+        ext: record.ext || '.jpg',
+        sha: record.sha || '',
+        blob: new Blob([record.bytes], { type: record.mime || 'image/jpeg' }),
+        thumb: URL.createObjectURL(new Blob([record.thumbBytes], { type: 'image/jpeg' })),
+        caption: entry.caption || '',
+        cover: Boolean(entry.cover) && !(project && project.hasCover),
+        // Sent again when published: GitHub may tidy away a photo that a save never used, and this page
+        // may be opened again weeks later. (A photo already in a project isn't sent twice; see core.publish.)
+        uploaded: false,
+        ready: true,
+        removed: false,
+      };
+      state.photos.push(photo);
+      renderPhoto(photo);
+      photo.row.caption.value = photo.caption;
+      photo.row.cover.checked = photo.cover;
+      photo.row.thumb.src = photo.thumb;
+      photo.row.thumb.hidden = false;
+      photo.row.status.hidden = true;
+      state.nextId = Math.max(state.nextId, record.id + 1);
+    });
+    numberRows();
+    updatePhotoStatus();
+    chapterChanged();
+    if (records.length) {
+      let text = 'Your photos from last time are back. Publish them, or tap Clear all photos.';
+      if (!known) text = target ? 'Your photos from last time are back, but their project isn’t on GitHub any more. Choose the project again (step 1).' : 'Your photos from last time are back. Choose their project (step 1), then publish them.';
+      setText(el.restored, text);
+    }
+    return true;
+  }
+
   /* ---------- Connecting this phone ---------- */
 
   function useKey(token) {
-    state.client = core.createClient({ token, repo, branch: config.branch });
+    state.client = core.createClient({ token, repo });
   }
 
+  /**
+   * GitHub refused the saved key. It stays on this phone until a new key works: the problem may pass,
+   * and it is the only copy the owner has.
+   */
   function askForKey(message) {
-    savedKey.clear();
     state.client = null;
     show('up-connect');
-    keyError(message || '');
+    keyError('');
+    const saved = Boolean(savedKey.get());
+    el.keyAgain.hidden = !saved;
+    el.keyAgainText.textContent = saved ? message || '' : '';
+    if (!saved) keyError(message || '');
   }
 
-  async function load({ treeSha, select } = {}) {
+  async function load({ treeSha, select, choose = false } = {}) {
     const sha = treeSha || (await state.client.head()).tree;
     state.tree = core.listProjects(await state.client.files(sha), config);
-    fillProjects(select);
+    fillProjects(select, { choose });
   }
 
   async function openForm({ keep = false } = {}) {
@@ -158,8 +334,13 @@
       return;
     }
     show('up-form');
-    if (keep) refreshChapters();
-    else await chooseProject();
+    if (keep) {
+      refreshChapters();
+      return;
+    }
+    if (!(await restoreDraft())) await chooseProject();
+    state.draftReady = true;
+    await saveDraft(true);
   }
 
   el.connect.addEventListener('submit', async (e) => {
@@ -178,11 +359,13 @@
     el.connectBtn.textContent = 'Connecting…';
     let remembered = false;
     try {
-      const client = core.createClient({ token, repo, branch: config.branch });
+      const client = core.createClient({ token, repo });
       await client.checkAccess();
       state.client = client;
+      // Only now, with a key that works, is the old one replaced.
       remembered = savedKey.set(token);
       el.key.value = '';
+      el.keyAgain.hidden = true;
     } catch (err) {
       keyError(core.describeError(err, repo, 'connect'));
       el.key.focus();
@@ -196,59 +379,94 @@
     if (!remembered) notice('This phone can’t remember the key (private browsing?), so you will need to paste it again next time.');
   });
 
+  el.keyRetry.addEventListener('click', () => {
+    const token = savedKey.get();
+    if (!token || state.busy) return;
+    useKey(token);
+    openForm({ keep: state.formStarted });
+  });
+  el.keyNew.addEventListener('click', () => {
+    el.key.focus();
+    el.key.scrollIntoView({ block: 'center' });
+  });
+
   el.retry.addEventListener('click', () => openForm({ keep: state.formStarted }));
 
   el.forget.addEventListener('click', () => {
     if (state.busy) return;
-    if (!window.confirm('Forget the GitHub key on this phone? To add photos again, you will need to paste a key.')) return;
+    if (!window.confirm('Forget the GitHub key on this phone, and any photos waiting to be sent? To add photos again, you will need to paste a key.')) return;
     savedKey.clear();
     state.client = null;
     state.tree = null;
     state.formStarted = false;
+    state.draftReady = false;
     state.memo = {};
+    savedMemo.set(null);
     clearPhotos();
+    kept.clear();
     resetChapter();
     fillDetails({});
     state.original = {};
+    state.pendingEdits = null;
+    setText(el.restored, '');
     notice('');
     sendError('');
     keyError('');
+    el.keyAgain.hidden = true;
     show('up-connect');
     el.key.focus();
   });
 
   /* ---------- 1. Which project ---------- */
 
-  function fillProjects(select) {
-    const wanted = select || el.project.value || core.NEW;
+  function fillProjects(select, { choose = false } = {}) {
+    const wanted = select === undefined ? el.project.value || core.NEW : select;
     el.project.textContent = '';
     const option = (value, text) => {
       const o = d.createElement('option');
       o.value = value;
       o.textContent = text;
       el.project.appendChild(o);
+      return o;
     };
+    if (choose) option('', 'Choose a project…').disabled = true;
     option(core.NEW, `New project (Project ${state.tree.next})`);
     state.tree.projects.forEach((p) => option(p.folder, core.projectLabel(p, config)));
-    el.project.value = state.tree.projects.some((p) => p.folder === wanted) ? wanted : core.NEW;
+    if (choose) el.project.value = '';
+    else el.project.value = state.tree.projects.some((p) => p.folder === wanted) ? wanted : core.NEW;
   }
 
   const currentProject = () => (state.tree ? state.tree.projects.find((p) => p.folder === el.project.value) || null : null);
 
+  function applyEdits(edits) {
+    el.fields.forEach((field) => {
+      if (Object.prototype.hasOwnProperty.call(edits, field.dataset.field)) field.value = edits[field.dataset.field];
+    });
+  }
+
   let detailsRun = 0;
-  async function chooseProject() {
+  /** Shows the chosen project's details. edits: typed details to put back on top (after a reload). */
+  async function chooseProject(edits) {
     const run = ++detailsRun;
     sendError('');
     refreshChapters();
-    const project = currentProject();
-    if (!project) {
+    state.pendingEdits = edits && Object.keys(edits).length ? edits : null;
+    if (!el.project.value) {
       fillDetails({});
       state.original = {};
+      setDetailsReady(false, 'Choose the project first (step 1).');
+      return;
+    }
+    const project = currentProject();
+    if (!project) {
+      fillDetails(edits || {});
+      state.original = {};
+      state.pendingEdits = null;
       setDetailsReady(true, '');
       el.details.open = true;
       return;
     }
-    el.details.open = false;
+    el.details.open = Boolean(state.pendingEdits);
     fillDetails({});
     setDetailsReady(false, 'Loading this project’s details…');
     try {
@@ -256,6 +474,8 @@
       if (run !== detailsRun) return;
       fillDetails(core.readInfo(text, config));
       state.original = currentDetails();
+      if (state.pendingEdits) applyEdits(state.pendingEdits);
+      state.pendingEdits = null;
       setDetailsReady(true, '');
     } catch (err) {
       if (run !== detailsRun) return;
@@ -268,8 +488,9 @@
     }
   }
 
-  el.project.addEventListener('change', () => {
-    chooseProject();
+  el.project.addEventListener('change', async () => {
+    await chooseProject();
+    saveDraft(true);
   });
 
   /* ---------- 2. Chapter ---------- */
@@ -345,8 +566,12 @@
     sendError('');
     chapterChanged();
     if (!el.customField.hidden) el.custom.focus();
+    saveDraft();
   });
-  el.custom.addEventListener('input', chapterChanged);
+  el.custom.addEventListener('input', () => {
+    chapterChanged();
+    saveDraft();
+  });
 
   /* ---------- 3. Photos ---------- */
 
@@ -355,6 +580,7 @@
     input.value = '';
     state.problems = [];
     sendError('');
+    setText(el.restored, '');
     for (const file of files) {
       const key = `${file.name}|${file.size}|${file.lastModified}`;
       if (state.photos.some((p) => p.key === key)) continue;
@@ -367,7 +593,7 @@
         state.problems.push(`${file.name}: ${problem.text}`);
         continue;
       }
-      const photo = { id: state.nextId++, key, name: file.name, type: file.type, file, caption: '', cover: false, sha: '', ready: false, removed: false };
+      const photo = { id: state.nextId++, key, name: file.name, type: file.type, file, caption: '', cover: false, sha: '', uploaded: false, ready: false, removed: false };
       state.photos.push(photo);
       renderPhoto(photo);
       state.preparing += 1;
@@ -418,6 +644,7 @@
     caption.addEventListener('input', () => {
       photo.caption = caption.value;
       refreshWarnings();
+      saveDraft();
     });
     const status = d.createElement('p');
     status.className = 'up-photo-state';
@@ -435,6 +662,7 @@
         p.row.cover.checked = p.cover;
       });
       refreshWarnings();
+      saveDraft();
     });
     coverLabel.append(cover, d.createTextNode('Cover photo'));
     const project = currentProject();
@@ -470,9 +698,11 @@
     if (photo.thumb) URL.revokeObjectURL(photo.thumb);
     photo.row.li.remove();
     state.photos = state.photos.filter((p) => p !== photo);
+    kept.remove(`photo:${photo.id}`);
     numberRows();
     updatePhotoStatus();
     refreshWarnings();
+    saveDraft();
   }
 
   function clearPhotos() {
@@ -481,11 +711,20 @@
     showProblems();
   }
 
+  el.clear.addEventListener('click', () => {
+    if (state.busy || !state.photos.length) return;
+    if (!window.confirm('Remove all the photos waiting to be sent? Photos already on your website stay there.')) return;
+    clearPhotos();
+    setText(el.restored, '');
+    saveDraft(true);
+  });
+
   function updatePhotoStatus() {
     const ready = state.photos.filter((p) => p.ready).length;
     el.photoStatus.textContent = state.preparing
       ? `Getting photos ready… ${state.preparing} to go.`
       : ready ? `${ready} photo${ready === 1 ? '' : 's'} ready.` : '';
+    el.clear.hidden = !state.photos.length;
   }
 
   async function prepare(photo) {
@@ -496,10 +735,23 @@
         URL.revokeObjectURL(made.thumb);
         return;
       }
-      Object.assign(photo, made, { ready: true, file: null });
+      // The same photo chosen twice is the same file for GitHub too: keep one.
+      const twin = made.sha && state.photos.find((p) => p !== photo && p.ready && p.sha === made.sha);
+      if (twin) {
+        URL.revokeObjectURL(made.thumb);
+        removePhoto(photo);
+        state.problems.push(`${photo.name}: this photo is in the list already.`);
+        showProblems();
+        return;
+      }
+      Object.assign(photo, { blob: made.blob, ext: made.ext, sha: made.sha, thumb: made.thumb, ready: true, file: null });
       photo.row.thumb.src = photo.thumb;
       photo.row.thumb.hidden = false;
       photo.row.status.hidden = true;
+      // Kept on the phone until it is published, so a closed page loses nothing.
+      await kept.put(`photo:${photo.id}`, { kind: 'photo', id: photo.id, name: photo.name, type: photo.type, ext: photo.ext, mime: made.blob.type, sha: photo.sha, bytes: made.bytes, thumbBytes: made.thumbBytes });
+      if (photo.removed) kept.remove(`photo:${photo.id}`);
+      else saveDraft(true);
     } catch (err) {
       if (!photo.removed) {
         removePhoto(photo);
@@ -521,6 +773,16 @@
     }
   }
 
+  function blobBytes(blob) {
+    if (blob.arrayBuffer) return blob.arrayBuffer();
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = () => reject(reader.error);
+      reader.readAsArrayBuffer(blob);
+    });
+  }
+
   /**
    * Redraws a photo at most 2000 px on its longest side and saves it as a new JPEG. The browser turns it
    * upright first, and the new file has none of the original's hidden data: no GPS location, no camera details.
@@ -539,10 +801,12 @@
       if (!width || !height) throw new PhotoProblem(core.unreadableText(file));
       if (width * height > core.MAX_PIXELS) throw new PhotoProblem(core.tooManyPixelsText(width, height));
       const blob = await drawJpeg(img, core.fitInside(width, height, config.maxSide), config.quality);
-      const thumb = await drawJpeg(img, core.fitInside(width, height, 240), 0.7);
+      const small = await drawJpeg(img, core.fitInside(width, height, 240), 0.7);
       // Every phone browser saves JPEG; one that can't falls back to PNG, and the file name says so.
       const ext = blob.type === 'image/png' ? '.png' : blob.type === 'image/webp' ? '.webp' : '.jpg';
-      return { blob, ext, thumb: URL.createObjectURL(thumb) };
+      const bytes = await blobBytes(blob);
+      const sha = await core.gitBlobSha(new Uint8Array(bytes)).catch(() => '');
+      return { blob, ext, sha, bytes, thumbBytes: await blobBytes(small), thumb: URL.createObjectURL(small) };
     } catch (err) {
       throw err instanceof PhotoProblem ? err : new PhotoProblem(core.unreadableText(file));
     } finally {
@@ -626,12 +890,14 @@
   }
 
   el.price.addEventListener('input', () => setText(el.priceErr, ''));
+  el.fieldsBox.addEventListener('input', () => saveDraft());
 
   /* ---------- Publish ---------- */
 
   function check(changes) {
     const isNew = el.project.value === core.NEW;
     const chapter = selectedChapter();
+    if (!el.project.value) return { text: 'Choose which project the photos are for (step 1).', focus: el.project };
     if (state.preparing) return { text: 'Wait a moment: the photos are still being made ready.' };
     if (isNew && !state.photos.length) return { text: 'Add at least one photo for the new project.', focus: el.gallery };
     if (state.photos.length && !chapter) return { text: 'Choose what the photos are of (step 2).', focus: el.chips.querySelector('input') };
@@ -718,22 +984,36 @@
     };
     state.busy = true;
     el.forget.disabled = true;
+    await saveDraft(true);
     show('up-progress');
     progress(0, photos.length ? 'Getting ready…' : 'Saving to GitHub…');
     const release = await keepScreenOn();
     window.addEventListener('beforeunload', stayHere);
     try {
-      const result = await core.publish({ client: state.client, config, request, photos, readBase64, onProgress, memo: state.memo });
+      const result = await core.publish({ client: state.client, config, request, photos, readBase64, onProgress, memo: state.memo, onMemo: () => saveDraft(true) });
       await finished(result);
     } catch (err) {
       show('up-form');
-      if (err.kind === 'auth') askForKey(core.describeError(err, repo, 'publish'));
-      else sendError(core.describeError(err, repo, 'publish'));
+      if (err.kind === 'auth') {
+        askForKey(core.describeError(err, repo, 'publish'));
+      } else {
+        if (err.kind === 'gone') {
+          // The project was renamed or removed meanwhile: show the projects as they are now, and keep the photos.
+          try {
+            await load({ choose: true });
+          } catch (loadErr) {
+            // The list stays as it was; the next publish reads GitHub again anyway.
+          }
+          await chooseProject();
+        }
+        sendError(core.describeError(err, repo, 'publish'));
+      }
     } finally {
       state.busy = false;
       el.forget.disabled = false;
       window.removeEventListener('beforeunload', stayHere);
       release();
+      saveDraft(true);
     }
   });
 
@@ -742,10 +1022,17 @@
     const photos = `${count} photo${count === 1 ? '' : 's'}`;
     const name = result.num ? `Project ${result.num}` : core.titleFromFolder(result.folder);
     let text;
-    if (result.unchanged) text = `Nothing new to save: ${name} already has these details.`;
-    else if (result.isNew) text = `${name} is saved with ${photos}. It will be on your website in about 2 minutes.`;
-    else if (count) text = `${photos} saved to ${name}. ${count === 1 ? 'It' : 'They'} will be on your website in about 2 minutes.`;
-    else text = `The details of ${name} are saved. They will be on your website in about 2 minutes.`;
+    if (result.already) {
+      text = `These photos are on GitHub already, in ${name}, so nothing was saved twice.${result.unchanged ? '' : ' The changed details are saved.'}`;
+    } else if (result.unchanged) {
+      text = `Nothing new to save: ${name} already has these details.`;
+    } else if (result.isNew) {
+      text = `${name} is saved with ${photos}. It will be on your website in about 2 minutes.`;
+    } else if (count) {
+      text = `${photos} saved to ${name}. ${count === 1 ? 'It' : 'They'} will be on your website in about 2 minutes.`;
+    } else {
+      text = `The details of ${name} are saved. They will be on your website in about 2 minutes.`;
+    }
     // The signal was lost just as GitHub saved the last publish: it is there, and nothing was saved twice.
     if (result.earlier) text = `Your last publish arrived after all. ${text}`;
     el.doneText.textContent = text;
@@ -753,15 +1040,19 @@
     el.doneLink.textContent = `See ${name} on your website`;
     // Only the photos that were saved leave the list (photos added since then stay for the next publish).
     const sent = new Set(result.sent || []);
-    state.photos.filter((p) => sent.has(p)).forEach(removePhoto);
+    state.photos.filter((p) => p.sha && sent.has(p.sha)).forEach(removePhoto);
     state.problems = [];
     showProblems();
+    setText(el.restored, '');
+    // What was typed is saved now, so it isn't kept as a change any more.
+    state.original = currentDetails();
     try {
       // The new commit's own files: reading the branch again could still show the old version for a moment.
       await load({ treeSha: result.tree, select: result.folder });
     } catch (err) {
       // The next publish reads GitHub again anyway.
     }
+    await saveDraft(true);
     show('up-done');
     el.done.focus();
   }
@@ -771,6 +1062,7 @@
     show('up-form');
     window.scrollTo(0, 0);
     await chooseProject();
+    saveDraft(true);
   });
 
   /* ---------- Start ---------- */

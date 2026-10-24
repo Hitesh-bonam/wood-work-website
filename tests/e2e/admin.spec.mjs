@@ -6,7 +6,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import sharp from 'sharp';
-import { FakeGitHub, routeGitHub, TEST_KEY, READ_ONLY_KEY, TEST_REPO } from '../helpers/fake-github.mjs';
+import { FakeGitHub, routeGitHub, TEST_KEY, READ_ONLY_KEY, SECOND_KEY, TEST_REPO } from '../helpers/fake-github.mjs';
 import { writePhoto } from '../helpers/fixture.mjs';
 import { expectNoSidewaysScroll, watchForProblems } from './helpers.mjs';
 
@@ -38,6 +38,23 @@ async function fakeGitHub(page) {
 /** This phone already has the key, like after connecting once. */
 async function rememberKey(page) {
   await page.addInitScript(([name, key]) => window.localStorage.setItem(name, key), [KEY_NAME, TEST_KEY]);
+}
+
+/** What the page keeps on the phone (IndexedDB): how many waiting photos, and the rest of the page. */
+function keptOnPhone(page) {
+  return page.evaluate(() => new Promise((resolve) => {
+    const open = window.indexedDB.open('woodwork-upload', 1);
+    open.onupgradeneeded = () => open.result.createObjectStore('items');
+    open.onerror = () => resolve({ photos: -1, draft: null });
+    open.onsuccess = () => {
+      const all = open.result.transaction('items', 'readonly').objectStore('items').getAll();
+      all.onsuccess = () => {
+        open.result.close();
+        resolve({ photos: all.result.filter((item) => item.kind === 'photo').length, draft: all.result.find((item) => item.kind === 'draft') || null });
+      };
+      all.onerror = () => resolve({ photos: -1, draft: null });
+    };
+  }));
 }
 
 async function photoDir(testInfo) {
@@ -110,7 +127,7 @@ test.describe('phone upload page', () => {
     const files = fake.files();
     expect(Object.keys(files).filter((p) => !(p in before)).sort()).toEqual(['projects/project-11/info.txt', 'projects/project-11/woodwork/1-Tall unit.jpg', 'projects/project-11/woodwork/2.jpg']);
     for (const [p, content] of Object.entries(before)) expect(files[p].equals(Buffer.from(content)), `${p} is untouched`).toBe(true);
-    expect(fake.text('projects/project-11/info.txt')).toBe('Title: Phone test & <kitchen>\nArea: North\nSize:\nDays: 5\nFinished:\nType: Kitchens\nAbout:\n\nReview:\nReview by:\nVideo:\nCover: 2.jpg\n\nPrice:\nCabinets = 1,20,000\nPaint = 30k\nNote: GST extra\n');
+    expect(fake.text('projects/project-11/info.txt')).toBe('Title: Phone test & <kitchen>\nArea: North\nSize:\nDays: 5\nFinished:\nType: Kitchens\nAbout:\n\nReview:\nReview by:\nVideo:\nCover: woodwork/2.jpg\n\nPrice:\nCabinets = 1,20,000\nPaint = 30k\nNote: GST extra\n');
 
     // The photos were made at most 2000 px, upright, as JPEG, with no GPS or camera details left in them.
     const tall = await sharp(files['projects/project-11/woodwork/1-Tall unit.jpg']).metadata();
@@ -306,6 +323,151 @@ test.describe('phone upload page', () => {
     await expectNoSidewaysScroll(page);
     await expectBigTargets();
     await axe();
+  });
+
+  test('photos, captions and details wait on the phone if the page is closed, and Clear removes them', async ({ page }, testInfo) => {
+    await rememberKey(page);
+    const { fake } = await fakeGitHub(page);
+    const dir = await photoDir(testInfo);
+    const wall = await writePhoto(dir, 'IMG_1.jpg', 'paint', { width: 1200, height: 900 });
+    const door = await writePhoto(dir, 'IMG_2.jpg', 'door', { width: 900, height: 1200 });
+    await page.goto('admin/');
+    await expect(page.getByLabel('Project', { exact: true })).toHaveValue('new', SLOW);
+    await chapter(page, 'Painting').click();
+    await page.locator('#up-gallery').setInputFiles([wall, door]);
+    await expect(page.locator('#up-photo-status')).toHaveText('2 photos ready.', SLOW);
+    await page.getByLabel('Caption for photo 1 (optional)').fill('Accent wall');
+    await page.locator('.up-photo').nth(1).getByRole('checkbox', { name: 'Cover photo' }).check();
+    await page.getByLabel('Title', { exact: true }).fill('Kept on the phone');
+    await expect.poll(async () => (await keptOnPhone(page)).photos, SLOW).toBe(2);
+    await expect.poll(async () => (await keptOnPhone(page)).draft?.edits?.title, SLOW).toBe('Kept on the phone');
+
+    // The phone closes the page (low memory while the camera is open) and it is opened again.
+    await page.reload();
+    await expect(page.locator('.up-photo')).toHaveCount(2, SLOW);
+    await expect(page.locator('#up-restored')).toContainText('Your photos from last time are back');
+    await expect(page.locator('img.up-thumb:visible')).toHaveCount(2);
+    await expect(page.getByLabel('Caption for photo 1 (optional)')).toHaveValue('Accent wall');
+    await expect(page.locator('.up-photo').nth(1).getByRole('checkbox', { name: 'Cover photo' })).toBeChecked();
+    await expect(page.locator('#up-chips input[value="painting"]')).toBeChecked();
+    await expect(page.getByLabel('Title', { exact: true })).toHaveValue('Kept on the phone');
+    await publish(page).click();
+    await expect(page.locator('#up-done-text')).toHaveText('Project 11 is saved with 2 photos. It will be on your website in about 2 minutes.', SLOW);
+    expect(fake.text('projects/project-11/info.txt')).toContain('Title: Kept on the phone\n');
+    expect(fake.text('projects/project-11/info.txt')).toContain('Cover: painting/2.jpg\n');
+    expect(Object.keys(fake.files()).filter((p) => p.startsWith('projects/project-11/painting/')).sort()).toEqual(['projects/project-11/painting/1-Accent wall.jpg', 'projects/project-11/painting/2.jpg']);
+
+    // Published photos aren't kept any more.
+    await expect.poll(async () => (await keptOnPhone(page)).photos, SLOW).toBe(0);
+    await page.reload();
+    await expect(page.getByLabel('Project', { exact: true }).locator('option').first()).toHaveText('New project (Project 12)', SLOW);
+    await expect(page.locator('.up-photo')).toHaveCount(0);
+
+    // "Clear all photos" removes waiting photos from the phone too.
+    await chapter(page, 'Woodwork').click();
+    await page.locator('#up-gallery').setInputFiles(wall);
+    await expect(page.locator('#up-photo-status')).toHaveText('1 photo ready.', SLOW);
+    await expect.poll(async () => (await keptOnPhone(page)).photos, SLOW).toBe(1);
+    page.once('dialog', (dialog) => dialog.accept());
+    await page.getByRole('button', { name: 'Clear all photos' }).click();
+    await expect(page.locator('.up-photo')).toHaveCount(0);
+    await expect.poll(async () => (await keptOnPhone(page)).photos, SLOW).toBe(0);
+    await page.reload();
+    await expect(page.getByLabel('Project', { exact: true })).toBeVisible(SLOW);
+    await expect(page.locator('.up-photo')).toHaveCount(0);
+  });
+
+  test('a key GitHub refuses stays on the phone until a new key works', async ({ page }) => {
+    const fake = new FakeGitHub({ files: await repoFiles(), keys: [TEST_KEY, SECOND_KEY] });
+    await routeGitHub(page, fake);
+    await page.goto('admin/');
+    await page.evaluate(([name, key]) => window.localStorage.setItem(name, key), [KEY_NAME, TEST_KEY]);
+    const savedKey = () => page.evaluate((name) => window.localStorage.getItem(name), KEY_NAME);
+
+    // A moment's trouble on GitHub (or the key was deleted there): the key is not thrown away.
+    fake.keys.delete(TEST_KEY);
+    await page.reload();
+    const again = page.locator('#up-key-again');
+    await expect(again).toBeVisible(SLOW);
+    await expect(again).toContainText('GitHub didn’t accept the key saved on this phone');
+    expect(await savedKey()).toBe(TEST_KEY);
+    fake.keys.add(TEST_KEY);
+    await again.getByRole('button', { name: 'Try again' }).click();
+    await expect(page.getByLabel('Project', { exact: true })).toBeVisible(SLOW);
+
+    // This time the key really is gone: a new key replaces it, but only once the new key works.
+    fake.keys.delete(TEST_KEY);
+    await page.reload();
+    await expect(again).toBeVisible(SLOW);
+    await again.getByRole('button', { name: 'Paste a new key' }).click();
+    const input = page.getByLabel('Your GitHub key');
+    await expect(input).toBeFocused();
+    await input.fill(`${SECOND_KEY}x`);
+    await page.getByRole('button', { name: 'Connect', exact: true }).click();
+    await expect(page.locator('#up-key-err')).toContainText('wrong or has expired', SLOW);
+    expect(await savedKey()).toBe(TEST_KEY);
+    await input.fill(SECOND_KEY);
+    await page.getByRole('button', { name: 'Connect', exact: true }).click();
+    await expect(page.getByLabel('Project', { exact: true })).toBeVisible(SLOW);
+    expect(await savedKey()).toBe(SECOND_KEY);
+  });
+
+  test('a project that disappears from GitHub is taken off the list, and the photos stay', async ({ page }, testInfo) => {
+    await rememberKey(page);
+    const { fake } = await fakeGitHub(page);
+    await page.goto('admin/');
+    const project = page.getByLabel('Project', { exact: true });
+    await project.selectOption('project-4');
+    await expect(page.getByLabel('Title', { exact: true })).toHaveValue('Single photo', SLOW);
+    await chapter(page, 'Woodwork').click();
+    await page.locator('#up-gallery').setInputFiles(await writePhoto(await photoDir(testInfo), 'shelf.jpg', 'wardrobe'));
+    await expect(page.locator('#up-photo-status')).toHaveText('1 photo ready.', SLOW);
+
+    // Meanwhile, on the computer, project-4 was renamed to project-14.
+    const files = fake.files();
+    const renamed = {};
+    for (const p of Object.keys(files).filter((name) => name.startsWith('projects/project-4/'))) {
+      renamed[p] = null;
+      renamed[p.replace('projects/project-4/', 'projects/project-14/')] = files[p];
+    }
+    fake.pushFromElsewhere(renamed);
+    await publish(page).click();
+    await expect(page.locator('#up-send-err')).toContainText('choose the project again, then tap Publish. Your photos are still here.', SLOW);
+    await expect(project).toHaveValue('');
+    const choices = await project.locator('option').evaluateAll((options) => options.map((o) => o.value));
+    expect(choices).not.toContain('project-4');
+    expect(choices).toContain('project-14');
+    await expect(page.locator('.up-photo')).toHaveCount(1);
+
+    await project.selectOption('project-14');
+    await expect(page.getByLabel('Title', { exact: true })).toHaveValue('Single photo', SLOW);
+    await publish(page).click();
+    await expect(page.locator('#up-done-text')).toHaveText('1 photo saved to Project 14. It will be on your website in about 2 minutes.', SLOW);
+    expect(Object.keys(fake.files()).filter((p) => p.startsWith('projects/project-14/woodwork/')).sort()).toEqual(['projects/project-14/woodwork/1.jpg', 'projects/project-14/woodwork/broken.jpg', 'projects/project-14/woodwork/good.jpg']);
+  });
+
+  test('when the signal goes just as GitHub saves, the reopened page finds that save instead of saving twice', async ({ page }, testInfo) => {
+    await rememberKey(page);
+    const { fake } = await fakeGitHub(page);
+    await page.goto('admin/');
+    await expect(page.getByLabel('Project', { exact: true })).toHaveValue('new', SLOW);
+    await chapter(page, 'Repairs').click();
+    await page.locator('#up-gallery').setInputFiles(await writePhoto(await photoDir(testInfo), 'IMG_7.jpg', 'damaged'));
+    await expect(page.locator('#up-photo-status')).toHaveText('1 photo ready.', SLOW);
+    fake.loseAnswerTo = 'PATCH';
+    await publish(page).click();
+    await expect(page.locator('#up-send-err')).toContainText('internet connection', { timeout: 60_000 });
+    expect(fake.history()).toHaveLength(2);
+
+    // The signal is back, and the phone had closed the page in the meantime.
+    fake.offline = false;
+    await page.reload();
+    await expect(page.locator('.up-photo')).toHaveCount(1, SLOW);
+    await publish(page).click();
+    await expect(page.locator('#up-done-text')).toHaveText('Your last publish arrived after all. Project 11 is saved with 1 photo. It will be on your website in about 2 minutes.', SLOW);
+    expect(fake.history()).toHaveLength(2);
+    expect(Object.keys(fake.files()).filter((p) => p.startsWith('projects/project-12/'))).toEqual([]);
+    await expect(page.locator('.up-photo')).toHaveCount(0);
   });
 
   test('is not linked from the website and asks search engines not to list it', async ({ page }) => {

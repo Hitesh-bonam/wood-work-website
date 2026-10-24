@@ -110,8 +110,17 @@ function collectPhotos(files, root, warn) {
   return photos;
 }
 
+/**
+ * The part of a photo's name that its before and after photos share. The number in front only sets the
+ * order, so "01-kitchen.jpg" in before/ pairs with "1-kitchen.jpg" or "kitchen.jpg" in after/; photos
+ * named only by a number pair by that number ("01.jpg" ↔ "1.jpg").
+ */
 function pairKey(photo) {
-  return path.parse(photo.name).name.toLowerCase().replace(/\b(before|after)\b/g, '').replace(/[^\p{L}\p{N}]+/gu, '');
+  const base = path.parse(photo.name).name.toLowerCase();
+  const order = base.match(/^\s*(\d+)(?:\s*[-_.)]\s*|\s+|$)/);
+  const words = (order ? base.slice(order[0].length) : base).replace(/\b(before|after)\b/g, '').replace(/[^\p{L}\p{N}]+/gu, '');
+  if (words) return words;
+  return order ? String(Number(order[1])) : '';
 }
 
 /** Matches before/after photos by name (kitchen.jpg ↔ kitchen.jpg), otherwise by order. */
@@ -263,8 +272,16 @@ async function scanProject({ dir, folder, num, slug, root, warn }) {
 
   let cover = coverPhoto;
   if (!cover && info.cover) {
-    const wanted = info.cover.trim().toLowerCase();
-    cover = allPhotos.find((p) => p.name.toLowerCase() === wanted || path.parse(p.name).name.toLowerCase() === wanted) || null;
+    // "Cover: woodwork/2.jpg" names one photo exactly (the phone writes it like that). A bare name like
+    // "2.jpg" or "kitchen" is looked for in every chapter, and a photo that isn't a before photo wins.
+    const wanted = info.cover.trim().replace(/\\/g, '/').replace(/^(\.?\/)+/, '').toLowerCase();
+    const inProject = (p) => relPath(dir, p.file).toLowerCase();
+    const bare = wanted.split('/').pop();
+    const named = (p) => p.name.toLowerCase() === bare || path.parse(p.name).name.toLowerCase() === bare;
+    cover = (wanted.includes('/') && allPhotos.find((p) => inProject(p) === wanted || inProject(p).replace(/\.[^./]*$/, '') === wanted))
+      || allPhotos.filter((p) => p.chapterTitle !== 'Before').find(named)
+      || allPhotos.find(named)
+      || null;
     if (!cover) warn(`${where}: the cover photo "${info.cover}" wasn't found, so the first photo is used.`);
   }
   if (!cover) {
@@ -348,13 +365,15 @@ export async function loadProjects(root, warn) {
     }
     return { folder, num: null, duplicate: num > 0 ? num : 0 };
   });
-  const suggestion = Math.max(0, ...used) + 1;
+  // Each folder without a number is offered its own free number, so following every tip gives no clashes.
+  let next = Math.max(0, ...used) + 1;
   const slugs = new Set([...used].map(String));
   for (const p of planned) {
     if (p.num) {
       p.slug = String(p.num);
       continue;
     }
+    const suggestion = next++;
     let slug = p.folder.toLowerCase().normalize('NFKD').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
     if (!slug || /^\d+$/.test(slug)) slug = `p-${createHash('sha1').update(p.folder).digest('hex').slice(0, 8)}`;
     while (slugs.has(slug)) slug = `${slug}-2`;

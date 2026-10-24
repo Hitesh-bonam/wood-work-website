@@ -41,6 +41,9 @@ test('a folder without a number never changes the numbers of the others', async 
   ]);
   assert.match(c.projects[3].slug, /^p-[0-9a-f]{8}$/);
   assert.ok(w.some((m) => m.includes('Two project folders use the number 1')));
+  // Every folder without a number gets its own suggestion, so following all the tips gives no clashes.
+  const tips = w.map((m) => (m.match(/"project-(\d+)"/) || [])[1]).filter(Boolean);
+  assert.deepEqual(tips.sort(), ['2', '3', '4']);
   await writePhoto(dir, 'projects/project-7/woodwork/a.jpg', 'wardrobe');
   const c2 = await loadContent(dir, () => {});
   assert.deepEqual(c2.projects.map((p) => p.slug), ['7', '1', 'kondapur-villa', 'project-1-copy', c.projects[3].slug]);
@@ -196,4 +199,45 @@ test('a missing site folder and an empty projects folder do not break anything',
   assert.equal(c2.projects[0].chapters[0].key, 'woodwork');
   assert.equal(c2.projects[0].allPhotos[0].caption, 'Shelf');
   await fs.rm(dir, { recursive: true, force: true });
+});
+
+test('a cover written with its folder is that exact photo; a bare name prefers photos that are not before photos', async () => {
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'ww-cover-'));
+  try {
+    for (const rel of ['before/2.jpg', 'woodwork/2.jpg', 'painting/2.jpg']) await writeText(dir, `projects/project-1/${rel}`, 'x');
+    const coverFor = async (line) => {
+      await writeText(dir, 'projects/project-1/info.txt', `Title: Cover test\n${line}\n`);
+      const w = [];
+      const [p] = (await loadContent(dir, (m) => w.push(m))).projects;
+      return { cover: path.relative(path.join(dir, 'projects', 'project-1'), p.cover.file).split(path.sep).join('/'), warned: w.some((m) => m.includes('cover photo')) };
+    };
+    assert.deepEqual(await coverFor('Cover: painting/2.jpg'), { cover: 'painting/2.jpg', warned: false });
+    assert.deepEqual(await coverFor('Cover: Painting/2'), { cover: 'painting/2.jpg', warned: false });
+    // A later photo of the same name in before/ never takes the cover's place.
+    assert.deepEqual(await coverFor('Cover: 2.jpg'), { cover: 'woodwork/2.jpg', warned: false });
+    assert.deepEqual(await coverFor('Cover: moved/2.jpg'), { cover: 'woodwork/2.jpg', warned: false });
+    assert.deepEqual(await coverFor('Cover: before/2.jpg'), { cover: 'before/2.jpg', warned: false });
+    const missing = await coverFor('Cover: woodwork/gone.jpg');
+    assert.equal(missing.warned, true);
+  } finally {
+    await fs.rm(dir, { recursive: true, force: true });
+  }
+});
+
+test('before and after photos pair by name even when only the number in front differs', async () => {
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'ww-pairs-'));
+  try {
+    for (const rel of ['before/01-kitchen.jpg', 'before/02.jpg', 'before/hall.jpg', 'before/2bhk-bedroom.jpg', 'after/2.jpg', 'after/1-Kitchen.jpg', 'after/03-hall.jpg', 'after/bhk-bedroom.jpg', 'after/extra-corner.jpg']) {
+      await writeText(dir, `projects/project-1/${rel}`, 'x');
+    }
+    const [p] = (await loadContent(dir, () => {})).projects;
+    const ba = p.chapters.find((c) => c.key === 'before-after');
+    const pairs = ba.pairs.map((pair) => `${pair.before.name} ↔ ${pair.after.name}`).sort();
+    assert.deepEqual(pairs, ['01-kitchen.jpg ↔ 1-Kitchen.jpg', '02.jpg ↔ 2.jpg', 'hall.jpg ↔ 03-hall.jpg']);
+    // "2bhk" is part of the name, not an order number, so it doesn't pair with "bhk-bedroom" by name
+    // (and with one photo left over on one side and two on the other, nothing pairs by order either).
+    assert.deepEqual(ba.photos.map((photo) => `${photo.label}: ${photo.name}`), ['Before: 2bhk-bedroom.jpg', 'After: bhk-bedroom.jpg', 'After: extra-corner.jpg']);
+  } finally {
+    await fs.rm(dir, { recursive: true, force: true });
+  }
 });

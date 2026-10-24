@@ -141,7 +141,8 @@ WhatsApp "Message yourself"), then delete that message.
 2. **Token name:** `Phone uploads`.
 3. **Resource owner:** the account or organization that owns the website, for example `yourwoodworks`.
 4. **Expiration:** the longest it offers (about a year). Put a reminder in your calendar for a few days
-   before it ends. When it runs out, the upload page says the key has expired; make a new one the same way.
+   before it ends. When it runs out, the upload page says GitHub didn't accept the key: make a new one the
+   same way and paste it. The old key stays on the phone until the new one works.
 5. **Repository access:** *Only select repositories*, then choose your website's repository (for example `website`).
 6. **Permissions:** under *Repository permissions*, set **Contents** to **Read and write**. Leave everything else as it is.
 7. Tap **Generate token** and copy the key. It starts with `github_pat_`. GitHub shows it only once.
@@ -150,7 +151,11 @@ WhatsApp "Message yourself"), then delete that message.
 The key can only change the files of this one repository, and the page sends it only to GitHub. Never
 share it or put it in a file. If a phone is lost, or someone else sees the key, delete the key on the same
 GitHub page and make a new one. *Forget this phone*, at the bottom of the upload page, removes the key
-from a phone you keep.
+(and any photos waiting to be sent) from a phone you keep.
+
+**One website per account:** every GitHub Pages website of one account or organization shares the same
+storage on the phone, so another website there could read the saved key. Don't make other GitHub Pages
+websites on this account, or give this one its own address (a custom domain).
 
 If the repository belongs to an organization, a key made by the organization's owner works straight away.
 A key made by anyone else must first be approved in the organization's *Settings › Personal access tokens*.
@@ -172,18 +177,25 @@ Good to know:
   GPS location**, because the repository is public.
 - **Before and after:** give each after photo the same caption as its before photo (the caption box
   suggests them), or add them in the same order. The website then shows the slider.
-- No signal at the site? Your photos stay on the page. Tap *Publish* again when you're back online.
+- **Photos wait on the phone until they're published,** with their captions and details, even if the
+  page closes (no signal, the camera app, the phone low on memory). Open the page again and they're back;
+  *Clear all photos* removes them.
+- No signal at the site? Tap *Publish* again when you're back online. Nothing is ever saved twice, even
+  if the signal went just as you published.
 - Each *Publish* is one save on GitHub, so you can see it there, and undo it if you need to.
 - Photos added from the phone appear in this folder on your computer the next time you run
   PREVIEW.cmd or PUBLISH.cmd. (In GitHub Desktop: *Fetch origin*, then *Pull origin*.)
-- **iPhone:** Safari forgets the key if you don't open the page for about a week. Adding the page to
-  your Home Screen keeps it; otherwise just paste the key again.
+- **iPhone:** Safari forgets the key, and any waiting photos, if you don't open the page for about a week.
+  Adding the page to your Home Screen keeps them; otherwise just paste the key again.
 
 ## Free limits, and when the website gets full
 
 - GitHub Pages gives each website **1 GB** and about **100 GB of visitors a month**, free.
-- Each photo uses about 250 KB on the website, so 1 GB holds **about 4,000 photos**
-  (roughly 150 projects of 25 photos). Every build prints how full the website is.
+- Each photo uses about 0.3 MB on the website, so the website holds **about 3,000 photos**.
+- The repository also keeps your photos (made smaller, about 0.5 MB each). GitHub asks that a
+  website's repository stays under about 1 GB, which is **about 2,000 photos** (roughly 80 projects
+  of 25 photos). Going a little over doesn't break anything, but plan the move below by then.
+- Every build prints how full both are, and warns you when one is close.
 - When it gets close to full: move older projects' photos into a second free GitHub repository,
   or serve this same repository from Cloudflare Pages (free, no 1 GB limit). Your files stay yours,
   so nothing needs to be redesigned.

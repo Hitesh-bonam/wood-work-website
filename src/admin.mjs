@@ -62,10 +62,9 @@ function fieldHtml(f) {
 }
 
 /** Everything the page's script needs to follow the website's own rules (see src/content.mjs). */
-export function adminConfig({ repo = '', branch = 'main', base = '/', projects = [] } = {}) {
+export function adminConfig({ repo = '', base = '/', projects = [] } = {}) {
   return {
     repo,
-    branch,
     base,
     maxSide: SOURCE_MAX,
     quality: QUALITY,
@@ -86,7 +85,6 @@ export function adminConfig({ repo = '', branch = 'main', base = '/', projects =
  * @param {string} ctx.base      path the site lives under, like "/website/"
  * @param {string} ctx.version   cache-busting version of the assets
  * @param {string} ctx.repo      "owner/name" on GitHub ('' when not known yet)
- * @param {string} ctx.branch    branch the website is published from
  * @param {object[]} ctx.projects projects on the website (for their titles)
  */
 export function renderAdminPage(ctx) {
@@ -99,7 +97,8 @@ export function renderAdminPage(ctx) {
   const brand = ctx.logo
     ? `<img src="${esc(u(`assets/photos/${ctx.logo.logo}`))}" width="${ctx.logo.logoW}" height="${ctx.logo.logoH}" alt=""><span>${esc(b.name)}</span>`
     : `<span>${esc(b.name)}</span>`;
-  const config = adminConfig({ repo: ctx.repo || '', branch: ctx.branch || 'main', base: ctx.base, projects: ctx.projects });
+  // No branch here: the page saves to the repository's default branch, as GitHub reports it.
+  const config = adminConfig({ repo: ctx.repo || '', base: ctx.base, projects: ctx.projects });
   const chips = CHAPTERS.map(([value, label]) => `<label class="tier"><input type="radio" name="chapter" value="${value}"><span>${esc(label)}</span></label>`).join('');
   const help = ctx.repo ? `https://github.com/${ctx.repo}#add-photos-from-your-phone` : 'https://github.com/';
 
@@ -139,6 +138,10 @@ ${icons}
 
 <form class="card" id="up-connect" aria-labelledby="up-connect-h" novalidate hidden>
 <h2 id="up-connect-h">Connect this phone</h2>
+<div class="up-again" id="up-key-again" hidden>
+<p class="up-alert" id="up-key-again-text" role="alert"></p>
+<div class="up-again-btns"><button class="btn primary big" id="up-key-retry" type="button">Try again</button><button class="btn big" id="up-key-new" type="button">Paste a new key</button></div>
+</div>
 <p>Paste the key you made on GitHub. This phone remembers it, so you only do this once.</p>
 <div class="field"><label for="up-key">Your GitHub key</label>
 <input id="up-key" type="password" autocomplete="off" autocapitalize="off" spellcheck="false" enterkeyhint="go" placeholder="github_pat_…" aria-describedby="up-key-help up-key-err">
@@ -168,10 +171,12 @@ ${icons}
 <label class="btn primary big up-pick-btn"><input class="up-file" id="up-gallery" type="file" accept="image/*" multiple><span>Choose photos</span></label>
 <label class="btn big up-pick-btn"><input class="up-file" id="up-camera" type="file" accept="image/*" capture="environment"><span>Take a photo</span></label>
 </div>
-<p class="hint">Before anything is sent, photos are made smaller and their location (GPS) is removed.</p>
+<p class="hint">Before anything is sent, photos are made smaller and their location (GPS) is removed. They wait on this phone until you publish them.</p>
 <p class="up-status" id="up-photo-status" role="status"></p>
+<p class="hint up-restored" id="up-restored" role="status" hidden></p>
 <p class="err" id="up-photo-err" role="alert" hidden></p>
 <ol class="up-photos" id="up-photos"></ol>
+<button class="btn up-clear" id="up-clear" type="button" hidden>Clear all photos</button>
 <datalist id="up-captions"></datalist>
 </section>
 

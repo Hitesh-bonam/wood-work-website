@@ -256,26 +256,20 @@
   /**
    * File names for new photos in a folder. They continue the folder's numbering, never clash with a file
    * that is there (whatever its capitals), and an after photo with the same caption as a before photo
-   * gets exactly that photo's name, so the website shows the two as a slider.
+   * gets exactly that photo's name, so the website shows the two as a slider. (The cover is written in
+   * info.txt with its folder, like "woodwork/2.jpg", so its name doesn't need to be unique.)
    */
   function namePhotos({ project, folder, photos, config }) {
     const key = chapterKeyOf(folder, config);
     const here = project.filesIn.get(folder) || [];
     const taken = new Set(here.map((n) => n.toLowerCase()));
-    // A cover is found by name, so its name must not appear anywhere else in the project.
-    const everywhere = new Set();
-    const remember = (name) => {
-      everywhere.add(name.toLowerCase());
-      everywhere.add(splitName(name).base.toLowerCase());
-    };
-    project.names.forEach(remember);
     let next = Math.max(0, ...here.map(orderNumber)) + 1;
     const partners = partnerNames(project, key, config);
     return photos.map((photo) => {
       const caption = cleanCaption(photo.caption);
       // Photos are saved as JPEG; a browser that can only save PNG keeps that ending, so the name never lies.
       const ext = photo.ext || '.jpg';
-      const free = (name) => !taken.has(name.toLowerCase()) && (!photo.cover || !everywhere.has(name.toLowerCase()));
+      const free = (name) => !taken.has(name.toLowerCase());
       let name = '';
       if (caption) {
         const partner = partners.find((n) => captionKey(captionFromFilename(n)) === captionKey(caption) && free(`${splitName(n).base}${ext}`));
@@ -288,7 +282,6 @@
       }
       next = Math.max(next, orderNumber(name) + 1);
       taken.add(name.toLowerCase());
-      remember(name);
       return name;
     });
   }
@@ -502,7 +495,8 @@
     const names = photos.length ? namePhotos({ project, folder, photos, config }) : [];
     const changes = Object.assign({}, request.changes);
     const coverAt = photos.findIndex((p) => p.cover);
-    if (coverAt !== -1 && !project.hasCover) changes.cover = names[coverAt];
+    // With its folder, so a later photo of the same name in another chapter can never take its place.
+    if (coverAt !== -1 && !project.hasCover) changes.cover = `${folder}/${names[coverAt]}`;
 
     let info = null;
     const changed = Object.keys(changes).length > 0;
@@ -572,11 +566,14 @@
    * Talks to the GitHub API with the owner's key. The key is only ever put in the Authorization header
    * of requests to api.github.com; it is never part of an address, logged or sent anywhere else.
    */
-  function createClient({ token, repo, branch = 'main', fetchImpl, wait = sleep, isOnline = defaultOnline }) {
+  function createClient({ token, repo, branch = '', fetchImpl, wait = sleep, isOnline = defaultOnline }) {
     if (!REPO.test(String(repo))) throw new UploadError('repo');
     const send = fetchImpl || ((url, init) => root.fetch(url, init));
     const repoPath = `/repos/${repo}`;
-    const refPath = String(branch).split('/').map(encodeURIComponent).join('/');
+    // The branch the website is published from: the repository's default branch, as GitHub reports it.
+    let name = String(branch || '');
+    let repoInfo = null;
+    const refPath = () => name.split('/').map(encodeURIComponent).join('/');
     let asked = 0;
 
     async function call(method, path, body, { timeout = 30000, attempts = 3 } = {}) {
@@ -624,16 +621,35 @@
     }
 
     const createBlob = async (base64, timeout) => (await call('POST', `${repoPath}/git/blobs`, { content: base64, encoding: 'base64' }, { timeout })).sha;
+    const readRepo = async () => {
+      repoInfo = await call('GET', repoPath);
+      if (!name) name = repoInfo.default_branch || 'main';
+      return repoInfo;
+    };
+    const branchName = async () => {
+      if (!name) await readRepo();
+      return name;
+    };
     // GitHub lets browsers keep its answers for a minute. Asking at a new address each time means a
     // second publish never builds on an old version. (Commits, trees and files never change, so they may be kept.)
-    const branchCommit = async () => (await call('GET', `${repoPath}/git/ref/heads/${refPath}?fresh=${Date.now().toString(36)}${++asked}`)).object.sha;
+    const branchCommit = async () => {
+      await branchName();
+      try {
+        return (await call('GET', `${repoPath}/git/ref/heads/${refPath()}?fresh=${Date.now().toString(36)}${++asked}`)).object.sha;
+      } catch (err) {
+        if (err.kind === 'notfound') throw Object.assign(new UploadError('nobranch', name, err.status), { branch: name });
+        throw err;
+      }
+    };
 
     return {
       repo,
-      branch,
+      get branch() {
+        return name;
+      },
       /** Run once when a key is pasted: can it read the repository, and save to it? */
       async checkAccess() {
-        const info = await call('GET', repoPath);
+        const info = await readRepo();
         try {
           // A tiny file nothing points to: it shows the key may save, and GitHub tidies it away later.
           await call('POST', `${repoPath}/git/blobs`, { content: 'Checking the upload key.\n', encoding: 'utf-8' });
@@ -648,15 +664,22 @@
         const commit = await call('GET', `${repoPath}/git/commits/${sha}`);
         return { commit: sha, tree: commit.tree.sha };
       },
-      /** True when the commit is on the branch, even with a few newer saves on top of it. */
+      /**
+       * True when the commit is on the branch, however many saves (or merges from the computer) came
+       * after it; false when it definitely isn't. Throws when GitHub can't be asked (then nobody knows).
+       */
       async isSaved(commitSha) {
-        let sha = await branchCommit();
-        for (let i = 0; sha && i < 5; i++) {
-          if (sha === commitSha) return true;
-          const commit = await call('GET', `${repoPath}/git/commits/${sha}`);
-          sha = commit.parents && commit.parents.length ? commit.parents[0].sha : '';
+        const head = await branchCommit();
+        if (head === commitSha) return true;
+        try {
+          // Both ends are fixed commits, so a browser's cached answer is always still right.
+          const result = await call('GET', `${repoPath}/compare/${commitSha}...${head}?per_page=1`, null, { timeout: 60000 });
+          return result.status === 'ahead' || result.status === 'identical';
+        } catch (err) {
+          // GitHub doesn't know that commit any more: it was never on the branch.
+          if (err.kind === 'notfound') return false;
+          throw err;
         }
-        return false;
       },
       async files(treeSha) {
         const tree = await call('GET', `${repoPath}/git/trees/${treeSha}?recursive=1`, null, { timeout: 60000 });
@@ -675,7 +698,8 @@
         return (await call('POST', `${repoPath}/git/commits`, { message, tree, parents: [parent] })).sha;
       },
       async moveBranch(sha) {
-        await call('PATCH', `${repoPath}/git/refs/heads/${refPath}`, { sha, force: false });
+        await branchName();
+        await call('PATCH', `${repoPath}/git/refs/heads/${refPath()}`, { sha, force: false });
       },
     };
   }
@@ -684,59 +708,106 @@
   const uploadTimeout = (base64Length) => 60000 + Math.round(base64Length / 25);
 
   const forget = (memo) => Object.keys(memo).forEach((key) => delete memo[key]);
+  /** A short, slightly random pause before working a save out again, so two savers don't keep colliding. */
+  const backoff = () => 1000 + Math.round(Math.random() * 1000);
 
   /**
    * Sends the photos, then saves everything as ONE commit on the branch: blobs → tree → commit → branch.
+   * Nothing is ever saved twice, even when the answer to the last step is lost (no signal at that moment):
+   * - memo (the page keeps it, also when the page is reloaded) holds the last commit until GitHub
+   *   definitely has it or definitely doesn't. The next try asks GitHub before anything else.
+   * - When every photo is on GitHub already (their blob SHAs are in a project), they count as saved.
    * If something else was saved in the meantime (the computer, another phone), the files are worked out
-   * again on top of it, so nothing is ever overwritten. photos[i].sha is kept, so a second try after a
-   * lost connection doesn't send the photos that already arrived.
-   * memo is kept by the page between tries: if the signal was lost just as GitHub saved, the next try
-   * finds that save instead of saving the same photos twice. result.sent lists the photos that were saved.
+   * again on top of it, so nothing is ever overwritten. photo.uploaded is kept, so a second try after a
+   * lost connection doesn't send the photos that already arrived. result.sent lists the saved photos' SHAs.
+   * onMemo(memo) is called whenever the memo changes, before the branch is moved, so the page can keep it.
    */
-  async function publish({ client, config, request, photos, readBase64, onProgress = () => {}, memo = {} }) {
+  async function publish({ client, config, request, photos, readBase64, onProgress = () => {}, memo = {}, onMemo = () => {}, wait = sleep }) {
     if (memo.commit) {
       onProgress({ stage: 'check', done: 0, total: photos.length });
+      // When GitHub can't be asked, this throws and the memo stays for the next try.
+      const saved = await client.isSaved(memo.commit);
       const earlier = Object.assign({}, memo);
-      if (await client.isSaved(earlier.commit)) {
-        forget(memo);
-        return Object.assign({}, earlier.plan, { commit: earlier.commit, tree: earlier.tree, sent: earlier.sent, earlier: true });
-      }
       forget(memo);
+      await onMemo(memo);
+      if (saved) return Object.assign({}, earlier.plan, { commit: earlier.commit, tree: earlier.tree, sent: earlier.sent || [], earlier: true });
     }
+
+    let head = await client.head();
+    let files = await client.files(head.tree);
+    const known = new Map();
+    const projectFolders = new Set(listProjects(files, config).projects.map((p) => p.folder));
+    for (const file of files) {
+      const parts = file.path.split('/');
+      if (parts[0] === 'projects' && projectFolders.has(parts[1]) && !known.has(file.sha)) known.set(file.sha, file.path);
+    }
+    let already = null;
+    if (photos.length && photos.every((p) => p.sha && known.has(p.sha))) {
+      // Every photo is on GitHub already: an earlier save arrived although the page never heard back.
+      // Only details that are still different are saved, to the project the photos are in.
+      const paths = photos.map((p) => known.get(p.sha));
+      already = { paths, sent: photos.map((p) => p.sha) };
+      request = { project: paths[0].split('/')[1], chapter: null, photos: [], changes: request.changes || {} };
+      photos = [];
+    }
+
     const total = photos.length;
+    let waited = false;
     for (let i = 0; i < total; i++) {
       onProgress({ stage: 'send', done: i, total });
-      if (!photos[i].sha) {
-        const base64 = await readBase64(photos[i]);
-        photos[i].sha = await client.createBlob(base64, uploadTimeout(base64.length));
-      }
+      const photo = photos[i];
+      if (photo.uploaded || (photo.sha && known.has(photo.sha))) continue;
+      const base64 = await readBase64(photo);
+      photo.sha = await client.createBlob(base64, uploadTimeout(base64.length));
+      photo.uploaded = true;
+      waited = true;
     }
     onProgress({ stage: 'save', done: total, total });
+    const sent = () => (already ? already.sent : photos.map((p) => p.sha));
     const wantsInfo = request.project !== NEW && (Object.keys(request.changes || {}).length > 0 || (request.photos || []).some((p) => p.cover));
     for (let attempt = 1; ; attempt++) {
-      const head = await client.head();
-      const state = listProjects(await client.files(head.tree), config);
+      // Sending photos takes time on a phone: look again at what is on the branch now.
+      if (attempt > 1 || waited) {
+        head = await client.head();
+        files = await client.files(head.tree);
+      }
+      const state = listProjects(files, config);
       const project = state.projects.find((p) => p.folder === request.project);
       const infoText = wantsInfo && project && project.info ? await client.readText(project.info.sha) : null;
       const plan = planUpload({ state, request, infoText, config });
+      if (already) Object.assign(plan, { already: true, alreadyPaths: already.paths });
       const entries = plan.paths.map((path, i) => ({ path, sha: photos[i].sha }));
       if (plan.info) entries.push({ path: plan.info.path, sha: await client.createBlob(textToBase64(plan.info.text)) });
-      if (!entries.length) return Object.assign(plan, { unchanged: true, commit: head.commit, tree: head.tree, sent: photos.slice() });
+      if (!entries.length) return Object.assign(plan, { unchanged: true, commit: head.commit, tree: head.tree, sent: sent() });
       const tree = await client.createTree(head.tree, entries);
       const commit = await client.createCommit(plan.message, tree, head.commit);
-      Object.assign(memo, { commit, tree, plan, sent: photos.slice() });
+      Object.assign(memo, { commit, tree, plan, sent: sent() });
+      await onMemo(memo);
       try {
         await client.moveBranch(commit);
       } catch (err) {
-        // GitHub may have saved it and only the answer was lost; otherwise the branch moved meanwhile.
-        if (!(await client.isSaved(commit).catch(() => false))) {
-          if (err.kind === 'conflict') forget(memo);
-          if (err.kind !== 'conflict' || attempt >= 3) throw err;
-          continue;
+        // The answer may have been lost after GitHub saved it, or the branch moved meanwhile.
+        let saved = null;
+        try {
+          saved = await client.isSaved(commit);
+        } catch (checkErr) {
+          saved = null; // GitHub can't be asked now: the memo stays, so the next try asks again
+        }
+        if (saved !== true) {
+          if (saved === false) {
+            forget(memo);
+            await onMemo(memo);
+            if (err.kind === 'conflict' && attempt < 3) {
+              await wait(backoff());
+              continue;
+            }
+          }
+          throw err;
         }
       }
       forget(memo);
-      return Object.assign(plan, { commit, tree, sent: photos.slice() });
+      await onMemo(memo);
+      return Object.assign(plan, { commit, tree, sent: sent() });
     }
   }
 
@@ -755,7 +826,7 @@
       case 'auth':
         return during === 'connect'
           ? 'GitHub says this key is wrong or has expired. Check that you copied all of it, or make a new key.'
-          : 'GitHub says the saved key is wrong or has expired. Paste a new key to carry on.';
+          : 'GitHub didn’t accept the key saved on this phone. It may have expired, or been deleted on GitHub. Tap Try again, or paste a new key.';
       case 'forbidden':
         return `This key isn't allowed to save to ${repo}. Make a new key for this repository with “Contents: Read and write” (see the README).`;
       case 'notfound':
@@ -771,7 +842,9 @@
       case 'empty':
         return "Your website isn't on GitHub yet. Put it online from your computer first (see the README).";
       case 'gone':
-        return "This project isn't on GitHub any more (it may have been renamed). Reload the page and choose it again.";
+        return 'This project isn’t on GitHub any more (it may have been renamed on the computer). The list of projects is up to date now: choose the project again, then tap Publish. Your photos are still here.';
+      case 'nobranch':
+        return `GitHub has no “${(err && err.branch) || 'main'}” branch in ${repo} yet. Put the website online from your computer first (see the README).`;
       case 'toomany':
         return 'There are too many files on GitHub for this page to read.';
       case 'chapter':
@@ -842,6 +915,21 @@
   }
   const textToBase64 = (text) => bytesToBase64(new TextEncoder().encode(text));
 
+  /**
+   * The SHA GitHub gives a file with these bytes (git's blob SHA-1), worked out on the phone, so the page
+   * knows before sending whether GitHub has this exact photo already. '' where the browser can't (http).
+   */
+  async function gitBlobSha(bytes) {
+    const subtle = root.crypto && root.crypto.subtle;
+    if (!subtle) return '';
+    const head = new TextEncoder().encode(`blob ${bytes.length}\0`);
+    const all = new Uint8Array(head.length + bytes.length);
+    all.set(head, 0);
+    all.set(bytes, head.length);
+    const digest = new Uint8Array(await subtle.digest('SHA-1', all));
+    return Array.from(digest, (b) => b.toString(16).padStart(2, '0')).join('');
+  }
+
   /** Reads a text file written by any editor (UTF-8, with or without BOM, or Notepad's UTF-16). */
   function decodeText(bytes) {
     if (bytes.length >= 2 && bytes[0] === 0xff && bytes[1] === 0xfe) return new TextDecoder('utf-16le').decode(bytes.subarray(2));
@@ -902,6 +990,7 @@
     bytesToBase64,
     base64ToBytes,
     textToBase64,
+    gitBlobSha,
     decodeText,
     findRepo,
   };

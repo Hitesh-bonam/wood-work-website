@@ -176,7 +176,7 @@ test('a new project gets the next number, its photos, an info.txt and a cover th
   assert.deepEqual(plan.paths, ['projects/project-11/woodwork/1-Tall unit.jpg', 'projects/project-11/woodwork/2.jpg']);
   assert.equal(plan.info.path, 'projects/project-11/info.txt');
   assert.equal(plan.message, 'Add photos from phone: project-11 (new project, 2 photos in woodwork)');
-  assert.equal(plan.info.text, 'Title: Kitchen & <dining>\nArea: North\nSize:\nDays: 12\nFinished:\nType: Kitchens, Wardrobes\nAbout:\n\nReview:\nReview by:\nVideo:\nCover: 2.jpg\n\nPrice:\nCabinets = 1,20,000\nPaint = 30k\nNote: GST extra\n');
+  assert.equal(plan.info.text, 'Title: Kitchen & <dining>\nArea: North\nSize:\nDays: 12\nFinished:\nType: Kitchens, Wardrobes\nAbout:\n\nReview:\nReview by:\nVideo:\nCover: woodwork/2.jpg\n\nPrice:\nCabinets = 1,20,000\nPaint = 30k\nNote: GST extra\n');
 
   const files = { ...existing, [plan.info.path]: plan.info.text };
   for (const p of plan.paths) files[p] = 'x';
@@ -192,11 +192,27 @@ test('a new project gets the next number, its photos, an info.txt and a cover th
   assert.deepEqual(warnings.filter((w) => w.includes('project-11')), []);
 });
 
-test('a cover photo gets a name no other photo in the project has', () => {
-  const state = core.listProjects(entries(['projects/project-3/woodwork/1.jpg', 'projects/project-3/woodwork/2.jpg']), config);
+test('the cover is written with its folder, so a photo of the same name elsewhere never takes its place', async () => {
+  const existing = { 'projects/project-3/woodwork/1.jpg': 'x', 'projects/project-3/woodwork/2.jpg': 'x' };
+  const state = core.listProjects(entries(Object.keys(existing)), config);
   const plan = core.planUpload({ state, request: { project: 'project-3', chapter: { key: 'painting' }, photos: [{ caption: '' }, { caption: '', cover: true }], changes: {} }, infoText: '', config });
-  assert.deepEqual(plan.names, ['1.jpg', '3.jpg']);
-  assert.match(plan.info.text, /\nCover: 3\.jpg\n/);
+  assert.deepEqual(plan.names, ['1.jpg', '2.jpg'], 'a cover keeps its normal name');
+  assert.match(plan.info.text, /\nCover: painting\/2\.jpg\n/);
+  // Later the computer adds before/2.jpg: the website still shows painting/2.jpg as the cover.
+  const files = { ...existing, [plan.info.path]: plan.info.text, 'projects/project-3/before/2.jpg': 'x' };
+  for (const p of plan.paths) files[p] = 'x';
+  const { projects } = await websiteProjects(files);
+  assert.equal(path.basename(path.dirname(projects[0].cover.file)), 'painting');
+
+  // An after photo marked as the cover still gets its before photo's name, so the two stay a slider.
+  const pairs = core.listProjects(entries(['projects/project-4/before/01-Kitchen wall.jpg']), config);
+  const after = core.planUpload({ state: pairs, request: { project: 'project-4', chapter: { key: 'after' }, photos: [{ caption: 'Kitchen wall', cover: true }], changes: {} }, infoText: '', config });
+  assert.deepEqual(after.names, ['01-Kitchen wall.jpg']);
+  assert.match(after.info.text, /\nCover: after\/01-Kitchen wall\.jpg\n/);
+  const site = await websiteProjects({ 'projects/project-4/before/01-Kitchen wall.jpg': 'x', [after.paths[0]]: 'x', [after.info.path]: after.info.text });
+  const p4 = site.projects[0];
+  assert.equal(p4.chapters[0].pairs.length, 1);
+  assert.equal(p4.cover, p4.chapters[0].pairs[0].after);
   // A project with a cover.jpg already keeps it.
   const withCover = core.listProjects(entries(['projects/project-3/cover.jpg', 'projects/project-3/woodwork/1.jpg']), config);
   assert.equal(withCover.projects[0].hasCover, true);
@@ -328,14 +344,18 @@ const REPO_FILES = {
 };
 const readBase64 = async (photo) => Buffer.from(photo.bytes).toString('base64');
 const photos = (...texts) => texts.map((t) => ({ bytes: t }));
-const shape = (log) => log.map((r) => `${r.method} ${r.path.replace(`/repos/${TEST_REPO}`, '').replace(/[0-9a-f]{40}/, '<sha>').replace(/\?fresh=\w+$/, '')}`);
+/** Photos as the page has them: with the SHA GitHub will give them, worked out on the phone. */
+const prepared = (...texts) => Promise.all(texts.map(async (t) => ({ bytes: t, sha: await core.gitBlobSha(new Uint8Array(Buffer.from(t))) })));
+const shape = (log) => log.map((r) => `${r.method} ${r.path.replace(`/repos/${TEST_REPO}`, '').replace(/[0-9a-f]{40}/g, '<sha>').replace(/\?fresh=\w+$/, '')}`);
+const commitsOnBranch = (fake) => fake.ancestors(fake.head).size;
+const blobPosts = (fake) => fake.log.filter((r) => r.method === 'POST' && r.path.endsWith('/git/blobs')).length;
 
 test('a new project is saved as ONE commit: photos, then tree, commit and branch', async () => {
   const fake = new FakeGitHub({ files: REPO_FILES });
   const client = core.createClient({ token: TEST_KEY, repo: TEST_REPO, fetchImpl: fake.fetch, wait: noWait });
   const progress = [];
   const request = { project: core.NEW, chapter: { key: 'painting' }, photos: [{ caption: 'Accent wall' }, { caption: '' }], changes: { title: 'Fresh paint', price: 'Painting = 39000' } };
-  const result = await core.publish({ client, config, request, photos: photos('one', 'two'), readBase64, onProgress: (p) => progress.push(`${p.stage} ${p.done}/${p.total}`) });
+  const result = await core.publish({ client, config, request, photos: photos('one', 'two'), readBase64, onProgress: (p) => progress.push(`${p.stage} ${p.done}/${p.total}`), wait: noWait });
   assert.equal(result.num, 3);
   assert.deepEqual(progress, ['send 0/2', 'send 1/2', 'save 2/2']);
   const history = fake.history();
@@ -350,9 +370,13 @@ test('a new project is saved as ONE commit: photos, then tree, commit and branch
   for (const [p, content] of Object.entries(REPO_FILES)) assert.equal(files[p].toString(), content, `${p} untouched`);
   assert.equal(Object.keys(files).length, Object.keys(REPO_FILES).length + 3);
   assert.deepEqual(shape(fake.log), [
-    'POST /git/blobs',
-    'POST /git/blobs',
+    'GET ', // the repository, for the branch the website is published from
     'GET /git/ref/heads/main',
+    'GET /git/commits/<sha>',
+    'GET /git/trees/<sha>?recursive=1', // are these photos on GitHub already?
+    'POST /git/blobs',
+    'POST /git/blobs',
+    'GET /git/ref/heads/main', // sending took a while: what is on the branch now?
     'GET /git/commits/<sha>',
     'GET /git/trees/<sha>?recursive=1',
     'POST /git/blobs',
@@ -372,7 +396,7 @@ test('the key goes only to api.github.com, in the Authorization header', async (
   };
   const client = core.createClient({ token: TEST_KEY, repo: TEST_REPO, fetchImpl: spy, wait: noWait });
   await client.checkAccess();
-  await core.publish({ client, config, request: { project: 'project-1', chapter: { key: 'woodwork' }, photos: [{ caption: '' }], changes: {} }, photos: photos('x'), readBase64 });
+  await core.publish({ client, config, request: { project: 'project-1', chapter: { key: 'woodwork' }, photos: [{ caption: '' }], changes: {} }, photos: photos('x'), readBase64, wait: noWait });
   assert.ok(seen.length > 5);
   for (const { url, init } of seen) {
     assert.ok(url.startsWith('https://api.github.com/repos/test-owner/woodwork-test'), url);
@@ -394,34 +418,37 @@ test('the key goes only to api.github.com, in the Authorization header', async (
   assert.ok(urls.every((url) => /\/git\/ref\/heads\/main\?fresh=[0-9a-z]+$/.test(url)), urls.join(' '));
 });
 
-test('if something else is saved at the same moment, the upload is worked out again on top of it', async () => {
+test('if something else is saved at the same moment, the upload is worked out again on top of it, after a short pause', async () => {
   const fake = new FakeGitHub({ files: REPO_FILES });
   fake.beforeMove = (gh) => gh.pushFromElsewhere({ 'projects/project-3/info.txt': 'Title: From the computer\n', 'projects/project-3/woodwork/1.jpg': 'pc' });
   const client = core.createClient({ token: TEST_KEY, repo: TEST_REPO, fetchImpl: fake.fetch, wait: noWait });
   const sent = photos('one');
-  const result = await core.publish({ client, config, request: { project: core.NEW, chapter: { key: 'woodwork' }, photos: [{ caption: '' }], changes: {} }, photos: sent, readBase64 });
+  const waits = [];
+  const result = await core.publish({ client, config, request: { project: core.NEW, chapter: { key: 'woodwork' }, photos: [{ caption: '' }], changes: {} }, photos: sent, readBase64, wait: async (ms) => waits.push(ms) });
   assert.equal(result.num, 4, 'project 3 was taken in the meantime');
+  assert.equal(waits.length, 1);
+  assert.ok(waits[0] >= 1000 && waits[0] <= 2000, `paused ${waits[0]} ms`);
   const history = fake.history();
   assert.deepEqual(history.map((c) => c.message), ['Add photos from phone: project-4 (new project, 1 photo in woodwork)', 'Update projects and photos', 'First version']);
   assert.equal(fake.text('projects/project-3/info.txt'), 'Title: From the computer\n', 'the other save is kept');
   assert.equal(fake.files()['projects/project-4/woodwork/1.jpg'].toString(), 'one');
-  assert.equal(fake.log.filter((r) => r.method === 'POST' && r.path.endsWith('/git/blobs')).length, 3, 'the photo was sent once (plus info.txt twice)');
+  assert.equal(blobPosts(fake), 3, 'the photo was sent once (plus info.txt twice)');
 });
 
 test('an existing project gets its photos and only the changed details', async () => {
   const fake = new FakeGitHub({ files: REPO_FILES });
   const client = core.createClient({ token: TEST_KEY, repo: TEST_REPO, fetchImpl: fake.fetch, wait: noWait });
-  const result = await core.publish({ client, config, request: { project: 'project-2', chapter: { key: 'woodwork' }, photos: [{ caption: 'Shelf', cover: true }], changes: { area: 'North East' } }, photos: photos('shelf'), readBase64 });
+  const result = await core.publish({ client, config, request: { project: 'project-2', chapter: { key: 'woodwork' }, photos: [{ caption: 'Shelf', cover: true }], changes: { area: 'North East' } }, photos: photos('shelf'), readBase64, wait: noWait });
   assert.equal(result.message, 'Add photos from phone: project-2 (1 photo in woodwork, details updated)');
-  assert.equal(fake.text('projects/project-2/info.txt'), '# notes stay\nTitle: Second\nArea: North East\nCover: 2-Shelf.jpg\n\nPrice:\nKitchen = 1,00,000\n');
+  assert.equal(fake.text('projects/project-2/info.txt'), '# notes stay\nTitle: Second\nArea: North East\nCover: woodwork/2-Shelf.jpg\n\nPrice:\nKitchen = 1,00,000\n');
   assert.equal(fake.files()['projects/project-2/woodwork/2-Shelf.jpg'].toString(), 'shelf');
 
-  const details = await core.publish({ client, config, request: { project: 'project-2', chapter: null, photos: [], changes: { title: 'Second, renamed' } }, photos: [], readBase64 });
+  const details = await core.publish({ client, config, request: { project: 'project-2', chapter: null, photos: [], changes: { title: 'Second, renamed' } }, photos: [], readBase64, wait: noWait });
   assert.equal(details.message, 'Update details from phone: project-2');
   assert.match(fake.text('projects/project-2/info.txt'), /^# notes stay\nTitle: Second, renamed\n/);
 
   const before = fake.head;
-  const same = await core.publish({ client, config, request: { project: 'project-2', chapter: null, photos: [], changes: { area: 'North East' } }, photos: [], readBase64 });
+  const same = await core.publish({ client, config, request: { project: 'project-2', chapter: null, photos: [], changes: { area: 'North East' } }, photos: [], readBase64, wait: noWait });
   assert.equal(same.unchanged, true);
   assert.equal(fake.head, before, 'nothing new, so no commit');
 });
@@ -438,47 +465,61 @@ test('a lost connection keeps the photos that already arrived, and Publish again
   const client = core.createClient({ token: TEST_KEY, repo: TEST_REPO, fetchImpl: flaky, wait: noWait, isOnline: () => !offline });
   const sent = photos('one', 'two');
   const request = { project: core.NEW, chapter: { key: 'woodwork' }, photos: [{ caption: '' }, { caption: '' }], changes: {} };
-  await assert.rejects(() => core.publish({ client, config, request, photos: sent, readBase64 }), (err) => err.kind === 'offline');
-  assert.ok(sent[0].sha && !sent[1].sha);
+  await assert.rejects(() => core.publish({ client, config, request, photos: sent, readBase64, wait: noWait }), (err) => err.kind === 'offline');
+  assert.ok(sent[0].uploaded && !sent[1].uploaded);
   assert.match(core.describeError({ kind: 'offline' }, TEST_REPO), /No internet.*tap Publish again/);
   assert.equal(fake.head, fake.firstCommit, 'nothing half-saved');
   offline = false;
-  await core.publish({ client, config, request, photos: sent, readBase64 });
-  const photoBlobs = fake.log.filter((r) => r.method === 'POST' && r.path.endsWith('/git/blobs')).length;
-  assert.equal(photoBlobs, 3, 'photo one was not sent twice (two photos and info.txt)');
+  await core.publish({ client, config, request, photos: sent, readBase64, wait: noWait });
+  assert.equal(blobPosts(fake), 3, 'photo one was not sent twice (two photos and info.txt)');
   assert.equal(fake.files()['projects/project-3/woodwork/2.jpg'].toString(), 'two');
 });
 
-test('a save whose answer was lost is found again, never saved twice', async () => {
-  const fake = new FakeGitHub({ files: REPO_FILES });
-  let mode = 'normal';
-  const lossy = async (url, init) => {
-    if (mode === 'offline') throw new TypeError('Failed to fetch');
-    const res = await fake.fetch(url, init);
-    if (init.method === 'PATCH' && mode === 'lose the answer') {
-      mode = 'offline';
-      throw new TypeError('Failed to fetch');
+test('a save whose answer was lost is found later, even after a merge or many saves from the computer', async () => {
+  for (const afterwards of ['a merge', 'six saves']) {
+    const fake = new FakeGitHub({ files: REPO_FILES });
+    let mode = 'normal';
+    const lossy = async (url, init) => {
+      if (mode === 'offline') throw new TypeError('Failed to fetch');
+      const res = await fake.fetch(url, init);
+      if (init.method === 'PATCH' && mode === 'lose the answer') {
+        mode = 'offline';
+        throw new TypeError('Failed to fetch');
+      }
+      return res;
+    };
+    const client = core.createClient({ token: TEST_KEY, repo: TEST_REPO, fetchImpl: lossy, wait: noWait, isOnline: () => mode !== 'offline' });
+    const memo = {};
+    const stored = []; // what the page keeps (sessionStorage and IndexedDB) each time the memo changes
+    const sent = await prepared('one', 'two');
+    const request = { project: core.NEW, chapter: { key: 'woodwork' }, photos: [{ caption: '' }, { caption: '' }], changes: { title: 'Lost answer' } };
+    mode = 'lose the answer';
+    await assert.rejects(() => core.publish({ client, config, request, photos: sent, readBase64, memo, onMemo: (m) => stored.push(JSON.stringify(m)), wait: noWait }), (err) => err.kind === 'offline');
+    const ours = memo.commit;
+    assert.ok(ours, 'the page remembers what it tried to save');
+    assert.equal(JSON.parse(stored.at(-1)).commit, ours, 'and kept it before the branch was moved');
+    assert.ok(fake.ancestors(fake.head).has(ours), 'GitHub did save it');
+    if (afterwards === 'a merge') {
+      fake.mergeFromElsewhere({ 'projects/project-1/woodwork/02-b.jpg': 'pc' });
+      assert.notEqual(fake.commits.get(fake.head).parents[0], ours, 'the save is now only a second parent');
+    } else {
+      for (let i = 2; i < 8; i++) fake.pushFromElsewhere({ [`projects/project-1/woodwork/0${i}-pc.jpg`]: `pc${i}` });
     }
-    return res;
-  };
-  const client = core.createClient({ token: TEST_KEY, repo: TEST_REPO, fetchImpl: lossy, wait: noWait, isOnline: () => mode !== 'offline' });
-  const memo = {};
-  const sent = photos('one', 'two');
-  const request = { project: core.NEW, chapter: { key: 'woodwork' }, photos: [{ caption: '' }, { caption: '' }], changes: { title: 'Lost answer' } };
-  mode = 'lose the answer';
-  await assert.rejects(() => core.publish({ client, config, request, photos: sent, readBase64, memo }), (err) => err.kind === 'offline');
-  assert.equal(fake.history().length, 2, 'GitHub did save it');
-  assert.ok(memo.commit, 'the page remembers what it tried to save');
-  mode = 'normal';
-  const again = await core.publish({ client, config, request, photos: sent, readBase64, memo });
-  assert.equal(again.earlier, true);
-  assert.equal(again.num, 3);
-  assert.deepEqual(again.sent, sent);
-  assert.equal(fake.history().length, 2, 'nothing was saved twice');
-  assert.deepEqual(memo, {});
-  assert.deepEqual(Object.keys(fake.files()).filter((p) => p.startsWith('projects/project-4/')), []);
+    // The page was closed and opened again: only what it kept is left.
+    const reopened = JSON.parse(stored.at(-1));
+    mode = 'normal';
+    const before = commitsOnBranch(fake);
+    const again = await core.publish({ client, config, request, photos: sent.map(({ bytes, sha }) => ({ bytes, sha })), readBase64, memo: reopened, wait: noWait });
+    assert.equal(again.earlier, true, afterwards);
+    assert.equal(again.num, 3);
+    assert.deepEqual(again.sent, sent.map((p) => p.sha));
+    assert.equal(commitsOnBranch(fake), before, `nothing was saved twice after ${afterwards}`);
+    assert.deepEqual(reopened, {});
+    assert.deepEqual(Object.keys(fake.files()).filter((p) => p.startsWith('projects/project-4/')), []);
+  }
 
   // The answer is lost, the repeated request is refused because the branch is already there: still one save.
+  const fake = new FakeGitHub({ files: REPO_FILES });
   let lose = true;
   const blip = async (url, init) => {
     const res = await fake.fetch(url, init);
@@ -489,11 +530,97 @@ test('a save whose answer was lost is found again, never saved twice', async () 
     }
     return res;
   };
-  const client2 = core.createClient({ token: TEST_KEY, repo: TEST_REPO, fetchImpl: blip, wait: noWait });
-  const result = await core.publish({ client: client2, config, request: { project: 'project-1', chapter: { key: 'woodwork' }, photos: [{ caption: '' }], changes: {} }, photos: photos('three'), readBase64, memo: {} });
+  const client = core.createClient({ token: TEST_KEY, repo: TEST_REPO, fetchImpl: blip, wait: noWait });
+  const result = await core.publish({ client, config, request: { project: 'project-1', chapter: { key: 'woodwork' }, photos: [{ caption: '' }], changes: {} }, photos: photos('three'), readBase64, memo: {}, wait: noWait });
   assert.equal(result.commit, fake.head);
-  assert.equal(fake.history().length, 3);
+  assert.equal(fake.history().length, 2);
   assert.deepEqual(Object.keys(fake.files()).filter((p) => p.startsWith('projects/project-1/woodwork/')).sort(), ['projects/project-1/woodwork/01-a.jpg', 'projects/project-1/woodwork/2.jpg']);
+});
+
+test('photos that are on GitHub already are not saved again, even when the page forgot its last save', async () => {
+  const fake = new FakeGitHub({ files: REPO_FILES });
+  const client = core.createClient({ token: TEST_KEY, repo: TEST_REPO, fetchImpl: fake.fetch, wait: noWait });
+  const first = await prepared('one', 'two');
+  const request = { project: core.NEW, chapter: { key: 'woodwork' }, photos: [{ caption: '' }, { caption: '' }], changes: { title: 'Saved once' } };
+  const result = await core.publish({ client, config, request, photos: first, readBase64, wait: noWait });
+  assert.deepEqual(result.sent, first.map((p) => p.sha));
+  assert.ok(fake.blobs.has(first[0].sha) && fake.blobs.has(first[1].sha), 'the phone works out the same SHA as GitHub');
+  const commits = commitsOnBranch(fake);
+
+  // The answer was lost and the page forgot it (another browser, private mode): the same photos again.
+  const again = await core.publish({ client, config, request, photos: await prepared('one', 'two'), readBase64, memo: {}, wait: noWait });
+  assert.equal(again.already, true);
+  assert.equal(again.unchanged, true);
+  assert.equal(again.folder, 'project-3');
+  assert.equal(again.num, 3);
+  assert.deepEqual(again.alreadyPaths, ['projects/project-3/woodwork/1.jpg', 'projects/project-3/woodwork/2.jpg']);
+  assert.deepEqual(again.sent, first.map((p) => p.sha));
+  assert.equal(commitsOnBranch(fake), commits, 'no second copy of the project');
+  assert.equal(blobPosts(fake), 3, 'and the photos were not even sent again');
+
+  // A detail changed since then is still saved, to the project the photos are in.
+  const details = await core.publish({ client, config, request: { ...request, changes: { title: 'Saved once', area: 'North' } }, photos: await prepared('one', 'two'), readBase64, memo: {}, wait: noWait });
+  assert.equal(details.already, true);
+  assert.equal(details.message, 'Update details from phone: project-3');
+  assert.match(fake.text('projects/project-3/info.txt'), /^Title: Saved once\nArea: North\n/);
+
+  // With one new photo among them, everything is published as usual (a photo may be used twice on purpose).
+  const mixed = await core.publish({ client, config, request: { project: 'project-3', chapter: { key: 'painting' }, photos: [{}, {}], changes: {} }, photos: await prepared('one', 'new'), readBase64, memo: {}, wait: noWait });
+  assert.equal(mixed.already, undefined);
+  assert.deepEqual(mixed.paths, ['projects/project-3/painting/1.jpg', 'projects/project-3/painting/2.jpg']);
+  assert.equal(fake.files()['projects/project-3/painting/1.jpg'].toString(), 'one');
+});
+
+test('the last save is forgotten only when GitHub definitely does not have it', async () => {
+  const fake = new FakeGitHub({ files: REPO_FILES });
+  let offline = false;
+  const fetchImpl = async (url, init) => {
+    if (offline) throw new TypeError('Failed to fetch');
+    return fake.fetch(url, init);
+  };
+  const client = core.createClient({ token: TEST_KEY, repo: TEST_REPO, fetchImpl, wait: noWait, isOnline: () => !offline });
+  const request = { project: 'project-1', chapter: { key: 'woodwork' }, photos: [{ caption: '' }], changes: {} };
+  const changes = [];
+  // A commit GitHub has, but that never made it onto the branch.
+  const stray = fake.addCommit({ tree: fake.commits.get(fake.head).tree, parents: [fake.head], message: 'never on the branch' });
+  const memo = { commit: stray, tree: 'x', plan: {}, sent: [] };
+
+  // GitHub can't be asked: nobody knows, so the memo stays.
+  offline = true;
+  await assert.rejects(() => core.publish({ client, config, request, photos: photos('a'), readBase64, memo, onMemo: (m) => changes.push({ ...m }), wait: noWait }), (err) => err.kind === 'offline');
+  assert.equal(memo.commit, stray);
+  assert.deepEqual(changes, []);
+
+  // GitHub says it isn't on the branch: forgotten first, then the photo is published as usual.
+  offline = false;
+  const result = await core.publish({ client, config, request, photos: photos('a'), readBase64, memo, onMemo: (m) => changes.push({ ...m }), wait: noWait });
+  assert.equal(result.earlier, undefined);
+  assert.deepEqual(changes[0], {});
+  assert.deepEqual(result.paths, ['projects/project-1/woodwork/2.jpg']);
+
+  // A commit GitHub has never heard of (or has tidied away) was never saved either.
+  const unknown = { commit: 'f'.repeat(40), plan: {}, sent: [] };
+  const next = await core.publish({ client, config, request, photos: photos('b'), readBase64, memo: unknown, wait: noWait });
+  assert.equal(next.earlier, undefined);
+  assert.deepEqual(unknown, {});
+});
+
+test('photos are saved to the repository\'s default branch, and a missing branch says so', async () => {
+  const fake = new FakeGitHub({ files: REPO_FILES, branch: 'trunk' });
+  const client = core.createClient({ token: TEST_KEY, repo: TEST_REPO, fetchImpl: fake.fetch, wait: noWait });
+  const result = await core.publish({ client, config, request: { project: core.NEW, chapter: { key: 'woodwork' }, photos: [{}], changes: {} }, photos: photos('t'), readBase64, wait: noWait });
+  assert.equal(client.branch, 'trunk');
+  assert.equal(result.commit, fake.head);
+  assert.ok(fake.log.some((r) => r.method === 'PATCH' && r.path === `/repos/${TEST_REPO}/git/refs/heads/trunk`));
+  assert.ok(!fake.log.some((r) => r.path.includes('/heads/main')));
+  const connected = core.createClient({ token: TEST_KEY, repo: TEST_REPO, fetchImpl: fake.fetch, wait: noWait });
+  await connected.checkAccess();
+  assert.equal(connected.branch, 'trunk', 'learnt when the key is connected');
+
+  fake.branchMissing = true;
+  const err = await core.createClient({ token: TEST_KEY, repo: TEST_REPO, fetchImpl: fake.fetch, wait: noWait }).head().catch((e) => e);
+  assert.equal(err.kind, 'nobranch');
+  assert.match(core.describeError(err, TEST_REPO), /no “trunk” branch in test-owner\/woodwork-test yet/);
 });
 
 test('every GitHub problem becomes a clear message', async () => {
@@ -506,8 +633,11 @@ test('every GitHub problem becomes a clear message', async () => {
   assert.equal(await kind(make(READ_ONLY_KEY).checkAccess()), 'forbidden');
   assert.equal(await kind(make(TEST_KEY, 'test-owner/other').checkAccess()), 'notfound');
   assert.match(core.describeError({ kind: 'auth' }, TEST_REPO, 'connect'), /wrong or has expired/);
+  assert.match(core.describeError({ kind: 'auth' }, TEST_REPO, 'load'), /Tap Try again, or paste a new key/);
   assert.match(core.describeError({ kind: 'forbidden' }, TEST_REPO, 'connect'), /Contents: Read and write/);
   assert.match(core.describeError({ kind: 'notfound' }, TEST_REPO, 'connect'), /can't find test-owner\/woodwork-test/);
+  assert.match(core.describeError({ kind: 'gone' }, TEST_REPO), /choose the project again, then tap Publish\. Your photos are still here/);
+  assert.doesNotMatch(core.describeError({ kind: 'gone' }, TEST_REPO), /reload/i);
 
   // GitHub having a bad moment: tried again after a short wait.
   const waits = [];
@@ -535,14 +665,17 @@ test('every GitHub problem becomes a clear message', async () => {
   assert.equal(await kind(make(TEST_KEY, TEST_REPO, { fetchImpl: async () => { throw new TypeError('Failed to fetch'); } }).head()), 'network');
   assert.equal(await kind(make(TEST_KEY, TEST_REPO, { fetchImpl: async () => { throw new TypeError('Failed to fetch'); }, isOnline: () => false }).head()), 'offline');
 
-  // An empty repository, and someone else saving every single time.
+  // An empty repository, and someone else saving every single time (each time after a short pause).
   fake.failures.push({ method: 'GET', path: `/repos/${TEST_REPO}/git/ref/heads/main`, status: 409, json: { message: 'Git Repository is empty.' } });
   assert.equal(await kind(make(TEST_KEY).head()), 'empty');
   fake.failures.push(...[1, 2, 3].map(() => ({ method: 'PATCH', path: `/repos/${TEST_REPO}/git/refs/heads/main`, status: 422, json: { message: 'Update is not a fast forward' } })));
-  const busy = core.publish({ client: make(TEST_KEY), config, request: { project: 'project-1', chapter: { key: 'woodwork' }, photos: [{ caption: '' }], changes: {} }, photos: photos('x'), readBase64 });
+  const pauses = [];
+  const busy = core.publish({ client: make(TEST_KEY), config, request: { project: 'project-1', chapter: { key: 'woodwork' }, photos: [{ caption: '' }], changes: {} }, photos: photos('x'), readBase64, wait: async (ms) => pauses.push(ms) });
   assert.equal(await kind(busy), 'conflict');
+  assert.equal(pauses.length, 2);
+  assert.ok(pauses.every((ms) => ms >= 1000 && ms <= 2000), pauses.join(', '));
   assert.equal(fake.head, fake.firstCommit);
-  for (const k of ['offline', 'network', 'timeout', 'auth', 'forbidden', 'notfound', 'rate', 'conflict', 'toolarge', 'server', 'empty', 'gone', 'toomany', 'chapter', 'chapter-name', 'odd']) {
+  for (const k of ['offline', 'network', 'timeout', 'auth', 'forbidden', 'notfound', 'rate', 'conflict', 'toolarge', 'server', 'empty', 'gone', 'nobranch', 'toomany', 'chapter', 'chapter-name', 'odd']) {
     const text = core.describeError({ kind: k, message: 'detail' }, TEST_REPO);
     assert.ok(text.length > 20 && !text.includes(TEST_KEY), k);
   }
@@ -568,7 +701,7 @@ test('the upload page is built at admin/, never linked, not indexed, and only ta
     assert.ok(!html.includes('<b>'), 'text from the owner is escaped');
     const data = JSON.parse(html.match(/<script type="application\/json" id="up-config">(.*?)<\/script>/s)[1]);
     assert.equal(data.repo, 'me/website');
-    assert.equal(data.branch, 'main');
+    assert.equal('branch' in data, false, 'the page uses the default branch GitHub reports');
     assert.equal(data.base, '/website/');
     assert.equal(data.maxSide, 2000);
     assert.equal(data.quality, 0.84);

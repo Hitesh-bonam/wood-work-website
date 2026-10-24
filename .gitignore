@@ -6,6 +6,7 @@ playwright-report/
 tests/.tmp/
 *.cleaning.tmp
 tests/.last-run.txt
+tests/.rehearsal-run.txt
 
 # Files the website can't use are never uploaded: videos go on YouTube, and iPhone HEIC photos
 # must be saved as JPG first. The preview window tells you about any it finds.

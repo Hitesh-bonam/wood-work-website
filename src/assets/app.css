@@ -15,6 +15,8 @@
   --focus: #c9852f;
   --radius: 14px;
   --header-h: 56px;
+  /* How much of the top of the screen the header covers while scrolling (0 when it scrolls away). */
+  --sticky-h: var(--header-h);
   --tab-h: 62px;
   --max: 1180px;
   --gutter: 16px;
@@ -141,11 +143,25 @@ main:focus { outline: none; }
   text-decoration: none;
   font-family: var(--serif);
   font-weight: 700;
-  font-size: 1.15rem;
+  font-size: 1rem;
 }
-.brand img { height: 34px; width: auto; flex: none; }
-.brand span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.nav-desk { display: none; }
+/* A wide logo never takes the business name's room. */
+.brand img { height: 28px; width: auto; max-width: 64px; object-fit: contain; object-position: left center; flex: none; }
+/* The business name may take two lines; only a very long one is shortened, with "…". */
+.brand span {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow: hidden;
+  overflow-wrap: normal;
+  line-height: 1.15;
+}
+/* Menu items, buttons in rows and labels keep whole words; only the business name gives way. */
+.nav-desk { display: none; flex: none; gap: 4px; margin-left: 18px; }
+.nav-desk a { padding: 8px 14px; border-radius: 999px; color: var(--ink-2); font-weight: 600; text-decoration: none; white-space: nowrap; }
+.nav-desk a:hover { background: var(--wood-50); }
+.nav-desk a[aria-current="page"] { color: var(--wood-dark); background: var(--wood-50); }
 .top-act { display: flex; gap: 8px; margin-left: auto; flex: none; }
 .top-act .btn { min-height: 40px; }
 .top-act .btn.icon { width: 40px; }
@@ -278,7 +294,7 @@ main:focus { outline: none; }
 
 .chap-nav {
   position: sticky;
-  top: calc(var(--header-h) + env(safe-area-inset-top, 0px));
+  top: calc(var(--sticky-h) + env(safe-area-inset-top, 0px));
   z-index: 30;
   margin-top: 22px;
   background: rgba(250, 247, 242, 0.97);
@@ -309,7 +325,7 @@ main:focus { outline: none; }
 }
 .chap-in a[aria-current="true"] { background: var(--wood); border-color: var(--wood); color: #fff; }
 
-.chap { padding-top: 30px; scroll-margin-top: calc(var(--header-h) + 60px); }
+.chap { padding-top: 30px; scroll-margin-top: calc(var(--sticky-h) + 60px); }
 .chap h2 { font-size: 1.45rem; }
 .chap-sub { margin: 4px 0 14px; color: var(--ink-2); font-size: 0.95rem; }
 
@@ -572,6 +588,10 @@ dialog.viewer::backdrop { background: #111; }
 
 /* Tablets and up */
 @media (min-width: 480px) {
+  .brand img { max-width: 96px; }
+}
+/* The WhatsApp button says "WhatsApp" where the header has room for it. */
+@media (min-width: 600px) and (max-width: 767px) {
   .top-wa .lbl { display: inline; }
 }
 @media (min-width: 640px) {
@@ -590,14 +610,17 @@ dialog.viewer::backdrop { background: #111; }
   :root { --header-h: 64px; --gutter: 24px; }
   body { padding-bottom: 0; }
   .tabbar { display: none; }
-  .nav-desk { display: flex; gap: 4px; margin-left: 18px; }
-  .nav-desk a { padding: 8px 14px; border-radius: 999px; color: var(--ink-2); font-weight: 600; text-decoration: none; }
-  .nav-desk a:hover { background: var(--wood-50); }
-  .nav-desk a[aria-current="page"] { color: var(--wood-dark); background: var(--wood-50); }
+  .nav-desk { display: flex; margin-left: 4px; gap: 0; }
+  .nav-desk a { padding: 8px 10px; }
   .pricing { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 20px; align-items: start; }
   .pricing > .card:last-child:nth-child(odd) { grid-column: 1 / -1; }
 }
 @media (min-width: 1024px) {
+  .brand { font-size: 1.15rem; }
+  .brand img { height: 34px; max-width: 160px; }
+  .top-wa .lbl { display: inline; }
+  .nav-desk { margin-left: 18px; gap: 4px; }
+  .nav-desk a { padding: 8px 14px; }
   .pj-row { grid-template-columns: repeat(6, minmax(0, 1fr)); }
   .pj-row .tile:nth-child(5):not(.more) { display: block; }
   .more .t { display: none; }
@@ -609,6 +632,25 @@ dialog.viewer::backdrop { background: #111; }
   .mgrid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
   .foot-in { grid-template-columns: 1fr auto; align-items: start; }
   .foot-small { grid-column: 1 / -1; }
+}
+
+/* Phones held sideways: the screen is short, so the header scrolls away, the menu moves into the
+   header, and only the chapter menu stays at the top. */
+@media (max-height: 500px) and (orientation: landscape) {
+  :root { --sticky-h: 0px; }
+  body { padding-bottom: 0; }
+  .top { position: static; }
+  .tabbar { display: none; }
+  .nav-desk { display: flex; margin-left: 4px; gap: 0; }
+  .nav-desk a { padding: 6px 8px; }
+  .brand { font-size: 1rem; }
+  .brand img { height: 28px; max-width: 64px; }
+  .top-wa .lbl { display: none; }
+  /* The cover photo beside the project's title, so both fit on the short screen. */
+  .p-hero { grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); align-items: start; gap: 24px; }
+  .hero h1, .page-head h1 { font-size: 2rem; }
+  /* Even a very long project title fits beside the photo. */
+  .p-intro h1 { font-size: clamp(1.35rem, 3.5vw, 1.75rem); }
 }
 
 @media (prefers-reduced-motion: reduce) {

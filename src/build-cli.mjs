@@ -39,12 +39,10 @@ try {
   // GitHub sets GITHUB_REPOSITORY ("owner/name"); the upload page saves photos there.
   const result = await build({ root, out: path.join(root, 'dist'), base, siteUrl, repo: process.env.GITHUB_REPOSITORY || '' });
   for (const warning of result.warnings) console.log(`  ! ${warning}`);
-  const size = sizeReport(result.bytes);
+  const size = sizeReport(result.bytes, result.photoBytes);
   console.log(`Built ${result.projects} projects and ${result.photos} photos in ${(result.ms / 1000).toFixed(1)}s.`);
   console.log(size.text);
-  if (size.percent >= 80) {
-    console.log('  ! The website is getting close to the 1 GB free limit. See "Free limits, and when the website gets full" in README.md.');
-  }
+  if (size.warning) console.log(`  ! ${size.warning}`);
   if (process.env.GITHUB_ACTIONS) await reportUntidiedPhotos();
 } catch (err) {
   console.error(`Build failed: ${err.message}`);

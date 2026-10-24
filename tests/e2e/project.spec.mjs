@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { watchForProblems } from './helpers.mjs';
+import { watchForProblems, waitForScrollToStop } from './helpers.mjs';
 
 test.describe('project page', () => {
   test('tells the project as chapters, with a menu that follows the page', async ({ page }) => {
@@ -20,6 +20,26 @@ test.describe('project page', () => {
     await page.evaluate(() => window.scrollTo({ top: 0, behavior: 'instant' }));
     await expect(nav.locator('[aria-current]')).toHaveCount(0);
     expect(problems).toEqual([]);
+  });
+
+  test('on tall screens the chapter you tap is the one highlighted', async ({ page, isMobile }) => {
+    test.setTimeout(120_000);
+    const sizes = [{ width: 834, height: 1194 }, { width: 712, height: 1138 }];
+    // A tall computer screen; phones and tablets never have a window this big.
+    if (!isMobile) sizes.push({ width: 1440, height: 2200 });
+    for (const size of sizes) {
+      await page.setViewportSize(size);
+      await page.goto('project/1/');
+      const nav = page.getByRole('navigation', { name: 'Chapters' });
+      for (const name of ['Painting', 'Team', 'Woodwork', 'Before/after']) {
+        await nav.getByRole('link', { name }).click();
+        await expect(nav.getByRole('link', { name }), `${name} at ${size.width}x${size.height}`).toHaveAttribute('aria-current', 'true');
+        // Still the same chapter once the page has finished gliding and gone quiet.
+        await waitForScrollToStop(page);
+        await expect(nav.getByRole('link', { name }), `${name} at ${size.width}x${size.height} after the page stops`).toHaveAttribute('aria-current', 'true');
+        await expect(nav.locator('[aria-current]')).toHaveCount(1);
+      }
+    }
   });
 
   test('the before and after slider compares the two photos', async ({ page }) => {

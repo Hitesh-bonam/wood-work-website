@@ -6,6 +6,8 @@ import { createHash } from 'node:crypto';
 export const TEST_REPO = 'test-owner/woodwork-test';
 export const TEST_KEY = 'github_pat_11TESTKEY0123456789_abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789ab';
 export const READ_ONLY_KEY = 'github_pat_11READONLY0123456789_abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ01234';
+/** A second good key, like the new one the owner makes when the old one expired. */
+export const SECOND_KEY = 'github_pat_11SECONDKEY0123456789_abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123';
 
 const sha1 = (...parts) => {
   const hash = createHash('sha1');
@@ -34,6 +36,10 @@ export class FakeGitHub {
     this.failures = [];
     /** Runs once, just before the branch is moved: lets a test save something "from the computer" first. */
     this.beforeMove = null;
+    /** Set to make GitHub answer that the branch doesn't exist. */
+    this.branchMissing = false;
+    /** Browser tests: the next request with this method is carried out, but its answer never arrives. */
+    this.loseAnswerTo = null;
     const map = {};
     for (const [path, content] of Object.entries(files)) map[path] = this.addBlob(Buffer.from(content));
     this.head = this.addCommit({ tree: this.addTree(map), parents: [], message: 'First version' });
@@ -77,12 +83,43 @@ export class FakeGitHub {
     return out;
   }
 
+  /** Files of a commit changed by `files` (path → content, or null to delete the file). */
+  treeWith(commit, files) {
+    const map = { ...this.trees.get(this.commits.get(commit).tree) };
+    for (const [path, content] of Object.entries(files)) {
+      if (content === null) delete map[path];
+      else map[path] = this.addBlob(Buffer.from(content));
+    }
+    return this.addTree(map);
+  }
+
   /** Saves a commit as if it came from somewhere else, for example PUBLISH.cmd on the computer. */
   pushFromElsewhere(files, message = 'Update projects and photos') {
-    const map = { ...this.trees.get(this.commits.get(this.head).tree) };
-    for (const [path, content] of Object.entries(files)) map[path] = this.addBlob(Buffer.from(content));
-    this.head = this.addCommit({ tree: this.addTree(map), parents: [this.head], message });
+    this.head = this.addCommit({ tree: this.treeWith(this.head, files), parents: [this.head], message });
     return this.head;
+  }
+
+  /**
+   * The computer saved on top of an older version and then merged what is on GitHub (GitHub Desktop's
+   * "Pull origin" does this): the branch's latest commit is a merge whose SECOND parent is the old branch.
+   */
+  mergeFromElsewhere(files, base = this.firstCommit) {
+    const own = this.addCommit({ tree: this.treeWith(base, files), parents: [base], message: 'Update projects and photos' });
+    this.head = this.addCommit({ tree: this.treeWith(this.head, files), parents: [own, this.head], message: 'Merge branch main' });
+    return this.head;
+  }
+
+  /** Every commit reachable from `sha`, through all parents. */
+  ancestors(sha) {
+    const seen = new Set();
+    const stack = [sha];
+    while (stack.length) {
+      const next = stack.pop();
+      if (seen.has(next) || !this.commits.has(next)) continue;
+      seen.add(next);
+      stack.push(...this.commits.get(next).parents);
+    }
+    return seen;
   }
 
   /** Answers one request like api.github.com does. Returns { status, json, headers }. */
@@ -112,8 +149,22 @@ export class FakeGitHub {
     if (method === 'GET' && rest === '') {
       return { status: 200, json: { full_name: this.repo, default_branch: this.branch, private: false } };
     }
-    if (method === 'GET' && rest === `/git/ref/heads/${this.branch}`) {
+    if (method === 'GET' && rest.startsWith('/git/ref/heads/')) {
+      if (this.branchMissing || rest !== `/git/ref/heads/${this.branch}`) return { status: 404, json: { message: 'Not Found' } };
       return { status: 200, json: { ref: `refs/heads/${this.branch}`, object: { sha: this.head, type: 'commit' } } };
+    }
+    if (method === 'GET' && (m = rest.match(/^\/compare\/([0-9a-f]{40})\.\.\.([0-9a-f]{40})$/))) {
+      const [, base, head] = m;
+      if (!this.commits.has(base) || !this.commits.has(head)) return { status: 404, json: { message: 'Not Found' } };
+      const fromHead = this.ancestors(head);
+      const fromBase = this.ancestors(base);
+      let status = 'diverged';
+      if (base === head) status = 'identical';
+      else if (fromHead.has(base)) status = 'ahead';
+      else if (fromBase.has(head)) status = 'behind';
+      const aheadBy = [...fromHead].filter((sha) => !fromBase.has(sha)).length;
+      const behindBy = [...fromBase].filter((sha) => !fromHead.has(sha)).length;
+      return { status: 200, json: { status, ahead_by: aheadBy, behind_by: behindBy, base_commit: { sha: base }, commits: [], files: [] } };
     }
     if (method === 'GET' && (m = rest.match(/^\/git\/commits\/([0-9a-f]{40})$/))) {
       const commit = this.commits.get(m[1]);
@@ -203,6 +254,13 @@ export async function routeGitHub(page, fake) {
       res = await fake.handle({ method: request.method(), url: request.url(), headers: request.headers(), body: request.postDataBuffer() });
     } catch (err) {
       res = { status: 500, json: { message: `Fake GitHub failed: ${err.message}` } };
+    }
+    if (fake.loseAnswerTo && fake.loseAnswerTo === request.method()) {
+      // GitHub did it, but the signal went just then: the phone never hears back, and stays offline.
+      fake.loseAnswerTo = null;
+      fake.offline = true;
+      await route.abort('internetdisconnected');
+      return;
     }
     await route.fulfill({
       status: res.status,

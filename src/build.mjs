@@ -8,12 +8,14 @@ import { loadContent } from './content.mjs';
 import { cleanPhotoInPlace, processPhoto, makeShareImage, makeLogoFiles } from './photos.mjs';
 import { renderSite } from './pages.mjs';
 import { renderAdminPage, ADMIN_PAGE, ADMIN_ASSETS } from './admin.mjs';
-import { normalizeBase } from './util.mjs';
+import { normalizeBase, walk, PHOTO_EXTS } from './util.mjs';
 
 const ASSET_DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), 'assets');
 const LIMIT = Math.max(2, Math.min(6, (os.availableParallelism?.() ?? os.cpus().length) - 1));
 /** GitHub Pages allows a published site of up to 1 GB. */
 export const SITE_LIMIT_BYTES = 1024 ** 3;
+/** GitHub asks that a website's repository stays under about 1 GB; the photos are nearly all of it. */
+export const REPO_LIMIT_BYTES = 1024 ** 3;
 
 async function pool(items, limit, worker) {
   let next = 0;
@@ -41,6 +43,20 @@ async function dirSize(dir) {
     const full = path.join(dir, entry.name);
     if (entry.isDirectory()) total += await dirSize(full);
     else total += (await fs.stat(full)).size;
+  }
+  return total;
+}
+
+/** How much the photos in projects/ and site/ take up in the repository. */
+async function photoSize(root) {
+  let total = 0;
+  for (const file of [...(await walk(path.join(root, 'projects'))), ...(await walk(path.join(root, 'site')))]) {
+    if (!PHOTO_EXTS.has(path.extname(file).toLowerCase())) continue;
+    try {
+      total += (await fs.stat(file)).size;
+    } catch {
+      // removed meanwhile
+    }
   }
   return total;
 }
@@ -183,7 +199,6 @@ function pruneProject(project) {
  * @param {boolean} [options.dev]        adds the auto-refresh script used by the preview
  * @param {boolean} [options.cleanSources] tidies the original photos in place (preview and commit only)
  * @param {string} [options.repo]        "owner/name" on GitHub, for the upload page (default: from .git/config)
- * @param {string} [options.branch]      branch the upload page saves to (default: main)
  */
 export async function build(options) {
   const started = Date.now();
@@ -273,7 +288,6 @@ export async function build(options) {
     base,
     version: adminVersion,
     repo: options.repo || (await readGitHubRepo(root)),
-    branch: options.branch || 'main',
     projects: content.projects,
   });
   const pages = [
@@ -301,14 +315,21 @@ export async function build(options) {
     projects: content.projects.length,
     photos: content.projects.reduce((n, p) => n + p.allPhotos.length, 0) + content.materials.length + content.team.length,
     bytes: await dirSize(out),
+    photoBytes: await photoSize(root),
     ms: Date.now() - started,
     out,
   };
 }
 
-export function sizeReport(bytes) {
-  const mb = bytes / 1024 ** 2;
-  const percent = (bytes / SITE_LIMIT_BYTES) * 100;
-  const text = `Website size: ${mb < 10 ? mb.toFixed(1) : Math.round(mb)} MB of 1,024 MB (${percent < 1 ? '<1' : Math.round(percent)}% of the free GitHub space)`;
-  return { text, percent };
+/** How full the free GitHub space is: the website, and the photos in the repository. */
+export function sizeReport(bytes, photoBytes = 0) {
+  const mb = (n) => (n / 1024 ** 2 < 10 ? (n / 1024 ** 2).toFixed(1) : String(Math.round(n / 1024 ** 2)));
+  const share = (n) => (n < 1 ? '<1' : String(Math.round(n)));
+  const site = (bytes / SITE_LIMIT_BYTES) * 100;
+  const repo = (photoBytes / REPO_LIMIT_BYTES) * 100;
+  const text = `Website size: ${mb(bytes)} MB of 1,024 MB (${share(site)}% of the free GitHub space). Photos in the repository: ${mb(photoBytes)} MB of about 1,024 MB (${share(repo)}%).`;
+  const percent = Math.max(site, repo);
+  const what = site >= repo ? 'The website is' : 'The photos in the repository are';
+  const warning = percent >= 80 ? `${what} getting close to the 1 GB free limit. See "Free limits, and when the website gets full" in README.md.` : '';
+  return { text, percent, warning };
 }
