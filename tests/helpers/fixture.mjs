@@ -59,7 +59,7 @@ Repairs = Visit ₹500, then quoted
 `);
 
   // Project 1: everything at once, with tricky text.
-  await writeText(root, 'projects/project-1/info.txt', `
+  await writeText(root, 'images/project-1/info.txt', `
 Title: Kitchen & "Dining" <Room>
 Area: North
 Days: 10
@@ -73,47 +73,47 @@ Paint = ₹ 30k
 Hardware: 15000
 this line is wrong
 `);
-  await writePhoto(root, 'projects/project-1/before/kitchen.jpg', 'damaged');
-  await writePhoto(root, 'projects/project-1/before/hall.jpg', 'damaged');
-  await writePhoto(root, 'projects/project-1/before/extra-corner.jpg', 'damaged');
-  await writePhoto(root, 'projects/project-1/after/kitchen.jpg', 'kitchen');
-  await writePhoto(root, 'projects/project-1/after/hall.jpg', 'paint');
-  await writePhoto(root, 'projects/project-1/woodwork/01-tall-unit.jpg', 'wardrobe');
-  await writePhoto(root, 'projects/project-1/woodwork/IMG_20261012_101010.jpg', 'kitchen');
-  await writePhoto(root, 'projects/project-1/woodwork/03-tv-unit.png', 'tvunit');
-  await writePhoto(root, 'projects/project-1/painting/01-accent-wall.jpg', 'paint');
-  await writePhoto(root, 'projects/project-1/painting/02-texture.jpg', 'texture');
-  await writePhoto(root, 'projects/project-1/team/01-carpenter.jpg', 'team');
+  await writePhoto(root, 'images/project-1/before/kitchen.jpg', 'damaged');
+  await writePhoto(root, 'images/project-1/before/hall.jpg', 'damaged');
+  await writePhoto(root, 'images/project-1/before/extra-corner.jpg', 'damaged');
+  await writePhoto(root, 'images/project-1/after/kitchen.jpg', 'kitchen');
+  await writePhoto(root, 'images/project-1/after/hall.jpg', 'paint');
+  await writePhoto(root, 'images/project-1/woodwork/01-tall-unit.jpg', 'wardrobe');
+  await writePhoto(root, 'images/project-1/woodwork/IMG_20261012_101010.jpg', 'kitchen');
+  await writePhoto(root, 'images/project-1/woodwork/03-tv-unit.png', 'tvunit');
+  await writePhoto(root, 'images/project-1/painting/01-accent-wall.jpg', 'paint');
+  await writePhoto(root, 'images/project-1/painting/02-texture.jpg', 'texture');
+  await writePhoto(root, 'images/project-1/team/01-carpenter.jpg', 'team');
 
   // Project 2: no info.txt, a cover photo and loose photos.
-  await writePhoto(root, 'projects/project-2/cover.jpg', 'door');
-  await writePhoto(root, 'projects/project-2/a-side-view.jpg', 'door');
-  await writePhoto(root, 'projects/project-2/WhatsApp Image 2026-10-12 at 14.32.12.jpeg', 'paint');
+  await writePhoto(root, 'images/project-2/cover.jpg', 'door');
+  await writePhoto(root, 'images/project-2/a-side-view.jpg', 'door');
+  await writePhoto(root, 'images/project-2/WhatsApp Image 2026-10-12 at 14.32.12.jpeg', 'paint');
 
   // Project 10: a number above 9, and a folder name the site doesn't know (becomes its own chapter).
-  await writeText(root, 'projects/Project 10/info.txt', `
+  await writeText(root, 'images/Project 10/info.txt', `
 Title: Pooja room and wardrobes
 Type: Wardrobes
 `);
-  for (const [i, kind] of ['wardrobe', 'wardrobe', 'door', 'tvunit'].entries()) await writePhoto(root, `projects/Project 10/woodwork/0${i + 1}-unit.jpg`, kind);
-  await writePhoto(root, 'projects/Project 10/pooja room/01-pooja-unit.jpg', 'door');
-  await writePhoto(root, 'projects/Project 10/pooja room/02-bells.jpg', 'hardware');
+  for (const [i, kind] of ['wardrobe', 'wardrobe', 'door', 'tvunit'].entries()) await writePhoto(root, `images/Project 10/woodwork/0${i + 1}-unit.jpg`, kind);
+  await writePhoto(root, 'images/Project 10/pooja room/01-pooja-unit.jpg', 'door');
+  await writePhoto(root, 'images/Project 10/pooja room/02-bells.jpg', 'hardware');
 
   // A folder without a number.
-  await writePhoto(root, 'projects/new villa/woodwork/01.jpg', 'wardrobe');
+  await writePhoto(root, 'images/new villa/woodwork/01.jpg', 'wardrobe');
 
   // Only files the website can't use.
-  await writeText(root, 'projects/project-3/woodwork/photo.heic', 'not really a heic');
-  await writeText(root, 'projects/project-3/video.mp4', 'not really a video');
+  await writeText(root, 'images/project-3/woodwork/photo.heic', 'not really a heic');
+  await writeText(root, 'images/project-3/video.mp4', 'not really a video');
 
   // A damaged photo next to a good one.
-  await writeText(root, 'projects/project-4/info.txt', 'Title: Single photo\n');
-  await writeText(root, 'projects/project-4/woodwork/broken.jpg', 'this is not a jpeg');
-  await writePhoto(root, 'projects/project-4/woodwork/good.jpg', 'kitchen');
+  await writeText(root, 'images/project-4/info.txt', 'Title: Single photo\n');
+  await writeText(root, 'images/project-4/woodwork/broken.jpg', 'this is not a jpeg');
+  await writePhoto(root, 'images/project-4/woodwork/good.jpg', 'kitchen');
 
   // Ignored.
-  await writeText(root, 'projects/_template/info.txt', 'Title:\n');
-  await writeText(root, 'projects/_template/woodwork/.gitkeep', '');
+  await writeText(root, 'images/_template/info.txt', 'Title:\n');
+  await writeText(root, 'images/_template/woodwork/.gitkeep', '');
 
   await writePhoto(root, 'site/materials/01 BWP ply - Strong and waterproof.jpg', 'plywood');
   await writePhoto(root, 'site/materials/02 Laminate.jpg', 'laminate');

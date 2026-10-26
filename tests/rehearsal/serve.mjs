@@ -72,7 +72,7 @@ try {
   const started = Date.now();
   report.content = await makeRealisticContent(clone);
   report.steps.content = { ms: Date.now() - started, ok: true };
-  const sources = await dirSize(path.join(clone, 'projects'));
+  const sources = await dirSize(path.join(clone, 'images'));
   report.content.sourceMB = +(sources.total / 1048576).toFixed(1);
 
   const buildOutput = step('build', 'npm', ['run', 'build'], clone);

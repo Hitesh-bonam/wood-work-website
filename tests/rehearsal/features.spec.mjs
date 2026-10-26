@@ -26,22 +26,27 @@ test('gallery: filters, photo viewer, swipe and the Back button', async ({ page 
   await filters.getByRole('button', { name: 'All' }).click();
   await expect(page.locator('.pj:visible')).toHaveCount(all);
 
+  // The first photo in the gallery is the project's first after photo; the viewer opens on it, in the
+  // middle of the project's photos (its before photos come first).
   const tile = page.locator('.pj a.tile').first();
   await tile.click();
   const viewer = page.getByRole('dialog', { name: 'Photo viewer' });
-  await expect(viewer.locator('.v-title')).toHaveText(/ 1 \/ \d+$/);
+  const counter = viewer.locator('.v-title');
+  await expect(counter).toHaveText(/ \d+ \/ \d+$/);
+  const start = Number((await counter.textContent()).match(/ (\d+) \/ \d+$/)[1]);
+  await expect(viewer.locator('.v-cap .v-ch')).toHaveText('After');
   const photo = viewer.locator('.v-img');
   await expect(photo).toHaveJSProperty('complete', true);
   await expectInsideScreen(page, photo, 'the photo');
   await expectInsideScreen(page, viewer.getByRole('button', { name: 'Close' }), 'the close button');
   await viewer.getByRole('button', { name: 'Next photo' }).click();
-  await expect(viewer.locator('.v-title')).toHaveText(/ 2 \/ \d+$/);
+  await expect(counter).toHaveText(new RegExp(` ${start + 1} / \\d+$`));
   const stage = await viewer.locator('.v-stage').boundingBox();
   await page.mouse.move(stage.x + stage.width * 0.25, stage.y + stage.height / 2);
   await page.mouse.down();
   await page.mouse.move(stage.x + stage.width * 0.75, stage.y + stage.height / 2, { steps: 4 });
   await page.mouse.up();
-  await expect(viewer.locator('.v-title')).toHaveText(/ 1 \/ \d+$/);
+  await expect(counter).toHaveText(new RegExp(` ${start} / \\d+$`));
   await page.goBack();
   await expect(viewer).toBeHidden();
   await expect(page).toHaveURL(/\/website\/$/);
@@ -63,7 +68,7 @@ test('project page: chapters, before/after slider, story mode, price and next pr
   await slider.fill('25');
   await expect(page.locator('[data-ba]').first()).toHaveAttribute('style', /--pos:\s*25%/);
 
-  await page.locator('#ch-woodwork a[data-lb]').first().click();
+  await page.locator('#ch-after a[data-lb]').first().click();
   const viewer = page.getByRole('dialog', { name: 'Photo viewer' });
   await expect(viewer.locator('.v-img')).toHaveJSProperty('complete', true);
   await expectInsideScreen(page, viewer.locator('.v-img'), 'the photo');

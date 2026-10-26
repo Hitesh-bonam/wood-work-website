@@ -18,7 +18,7 @@ const GPS = { IFD0: { Make: 'PhoneCam', Model: 'X1' }, IFD3: { GPSLatitudeRef: '
 /** The test website's folders, as they would be on GitHub (.gitignore keeps videos and HEIC photos off it). */
 async function repoFiles() {
   const files = { 'README.md': '# Woodwork website\n' };
-  for (const folder of ['projects', 'site']) {
+  for (const folder of ['images', 'site']) {
     for (const entry of await fs.readdir(path.join(FIXTURE_SITE, folder), { recursive: true, withFileTypes: true })) {
       if (!entry.isFile() || /\.(heic|mp4)$/i.test(entry.name)) continue;
       const file = path.join(entry.parentPath ?? entry.path, entry.name);
@@ -99,7 +99,9 @@ test.describe('phone upload page', () => {
     await expect(project).toHaveValue('new');
     expect(await page.evaluate((name) => window.localStorage.getItem(name), KEY_NAME)).toBe(TEST_KEY);
 
-    await chapter(page, 'Woodwork').click();
+    // Every project has the same two folders, so a new project offers exactly these two choices.
+    await expect(page.locator('#up-chips label.tier')).toHaveText(['Before', 'After']);
+    await chapter(page, 'After').click();
     await page.locator('#up-gallery').setInputFiles([sideways, small]);
     const rows = page.locator('.up-photo');
     await expect(rows).toHaveCount(2);
@@ -123,16 +125,16 @@ test.describe('phone upload page', () => {
     const history = fake.history();
     expect(history).toHaveLength(2);
     expect(history[0].parents).toEqual([fake.firstCommit]);
-    expect(history[0].message).toBe('Add photos from phone: project-11 (new project, 2 photos in woodwork)');
+    expect(history[0].message).toBe('Add photos from phone: project-11 (new project, 2 photos in after)');
     const files = fake.files();
-    expect(Object.keys(files).filter((p) => !(p in before)).sort()).toEqual(['projects/project-11/info.txt', 'projects/project-11/woodwork/1-Tall unit.jpg', 'projects/project-11/woodwork/2.jpg']);
+    expect(Object.keys(files).filter((p) => !(p in before)).sort()).toEqual(['images/project-11/after/1-Tall unit.jpg', 'images/project-11/after/2.jpg', 'images/project-11/info.txt']);
     for (const [p, content] of Object.entries(before)) expect(files[p].equals(Buffer.from(content)), `${p} is untouched`).toBe(true);
-    expect(fake.text('projects/project-11/info.txt')).toBe('Title: Phone test & <kitchen>\nArea: North\nSize:\nDays: 5\nFinished:\nType: Kitchens\nAbout:\n\nReview:\nReview by:\nVideo:\nCover: woodwork/2.jpg\n\nPrice:\nCabinets = 1,20,000\nPaint = 30k\nNote: GST extra\n');
+    expect(fake.text('images/project-11/info.txt')).toBe('Title: Phone test & <kitchen>\nArea: North\nSize:\nDays: 5\nFinished:\nType: Kitchens\nAbout:\n\nReview:\nReview by:\nVideo:\nCover: after/2.jpg\n\nPrice:\nCabinets = 1,20,000\nPaint = 30k\nNote: GST extra\n');
 
     // The photos were made at most 2000 px, upright, as JPEG, with no GPS or camera details left in them.
-    const tall = await sharp(files['projects/project-11/woodwork/1-Tall unit.jpg']).metadata();
+    const tall = await sharp(files['images/project-11/after/1-Tall unit.jpg']).metadata();
     expect([tall.format, tall.width, tall.height]).toEqual(['jpeg', 1333, 2000]);
-    const second = await sharp(files['projects/project-11/woodwork/2.jpg']).metadata();
+    const second = await sharp(files['images/project-11/after/2.jpg']).metadata();
     expect([second.format, second.width, second.height]).toEqual(['jpeg', 800, 600]);
     for (const meta of [tall, second]) {
       expect(meta.exif).toBeUndefined();
@@ -184,8 +186,10 @@ test.describe('phone upload page', () => {
     await page.locator('#up-details summary').click();
     await page.getByLabel('Area', { exact: true }).fill('North East');
 
+    // A project that already has other folders can still get photos in them.
+    await expect(page.locator('#up-chips label.tier')).toHaveText(['Before', 'After', 'Painting', 'Team', 'Woodwork']);
     await chapter(page, 'After').click();
-    await expect(page.locator('#up-chapter-hint')).toContainText('same caption as its before photo');
+    await expect(page.locator('#up-chapter-hint')).toContainText('same caption as a before photo');
     expect(await page.locator('#up-captions option').evaluateAll((options) => options.map((o) => o.value))).toEqual(['Extra corner', 'Hall', 'Kitchen']);
     await page.locator('#up-gallery').setInputFiles(photo);
     await expect(page.locator('#up-photo-status')).toHaveText('1 photo ready.', SLOW);
@@ -197,10 +201,10 @@ test.describe('phone upload page', () => {
     expect(fake.history()[0].message).toBe('Add photos from phone: project-1 (1 photo in after, details updated)');
     const files = fake.files();
     // Same name as the before photo, so the website shows the two as a slider.
-    expect(Object.keys(files).filter((p) => !(p in before))).toEqual(['projects/project-1/after/extra-corner.jpg']);
-    const original = before['projects/project-1/info.txt'].toString('utf8');
-    expect(fake.text('projects/project-1/info.txt')).toBe(original.replace('Area: North\n', 'Area: North East\n'));
-    expect((await sharp(files['projects/project-1/after/extra-corner.jpg']).metadata()).exif).toBeUndefined();
+    expect(Object.keys(files).filter((p) => !(p in before))).toEqual(['images/project-1/after/extra-corner.jpg']);
+    const original = before['images/project-1/info.txt'].toString('utf8');
+    expect(fake.text('images/project-1/info.txt')).toBe(original.replace('Area: North\n', 'Area: North East\n'));
+    expect((await sharp(files['images/project-1/after/extra-corner.jpg']).metadata()).exif).toBeUndefined();
     expect(problems).toEqual([]);
   });
 
@@ -244,8 +248,8 @@ test.describe('phone upload page', () => {
     }
 
     await publish(page).click();
-    await expect(page.locator('#up-send-err')).toHaveText('Choose what the photos are of (step 2).');
-    await chapter(page, 'Repairs').click();
+    await expect(page.locator('#up-send-err')).toHaveText('Choose Before or After (step 2).');
+    await chapter(page, 'Before').click();
 
     // No signal: every request to GitHub fails, as on a phone with no internet. (context.setOffline is
     // not used: toggling it while requests are routed can leave the browser unable to close.)
@@ -257,22 +261,22 @@ test.describe('phone upload page', () => {
     fake.offline = false;
     await publish(page).click();
     await expect(page.locator('#up-done-text')).toHaveText('Project 11 is saved with 1 photo. It will be on your website in about 2 minutes.', SLOW);
-    expect(Object.keys(fake.files()).filter((p) => p.startsWith('projects/project-11/')).sort()).toEqual(['projects/project-11/info.txt', 'projects/project-11/repairs/1.jpg']);
+    expect(Object.keys(fake.files()).filter((p) => p.startsWith('images/project-11/')).sort()).toEqual(['images/project-11/before/1.jpg', 'images/project-11/info.txt']);
   });
 
   test('when the computer saves at the same moment, the phone\'s photos become the next project', async ({ page }, testInfo) => {
     await rememberKey(page);
     const { fake } = await fakeGitHub(page);
-    fake.beforeMove = (gh) => gh.pushFromElsewhere({ 'projects/project-11/info.txt': 'Title: Made on the computer\n', 'projects/project-11/woodwork/1.jpg': 'x' });
+    fake.beforeMove = (gh) => gh.pushFromElsewhere({ 'images/project-11/info.txt': 'Title: Made on the computer\n', 'images/project-11/woodwork/1.jpg': 'x' });
     await page.goto('admin/');
     await expect(page.getByLabel('Project', { exact: true }).locator('option').first()).toHaveText('New project (Project 11)', SLOW);
-    await chapter(page, 'Painting').click();
+    await chapter(page, 'After').click();
     await page.locator('#up-gallery').setInputFiles(await writePhoto(await photoDir(testInfo), 'wall.jpg', 'paint'));
     await expect(page.locator('#up-photo-status')).toHaveText('1 photo ready.', SLOW);
     await publish(page).click();
     await expect(page.locator('#up-done-text')).toHaveText('Project 12 is saved with 1 photo. It will be on your website in about 2 minutes.', SLOW);
-    expect(fake.history().map((c) => c.message)).toEqual(['Add photos from phone: project-12 (new project, 1 photo in painting)', 'Update projects and photos', 'First version']);
-    expect(fake.text('projects/project-11/info.txt')).toBe('Title: Made on the computer\n');
+    expect(fake.history().map((c) => c.message)).toEqual(['Add photos from phone: project-12 (new project, 1 photo in after)', 'Update projects and photos', 'First version']);
+    expect(fake.text('images/project-11/info.txt')).toBe('Title: Made on the computer\n');
   });
 
   test('fits the screen, has big buttons and is accessible', async ({ page, isMobile }, testInfo) => {
@@ -301,9 +305,7 @@ test.describe('phone upload page', () => {
     await page.getByLabel('Project', { exact: true }).selectOption('project-1');
     await expect(page.getByLabel('Title', { exact: true })).toHaveValue('Kitchen & "Dining" <Room>', SLOW);
     await page.locator('#up-details summary').click();
-    await chapter(page, 'New chapter…').click();
-    await expect(page.getByLabel('Name of the new chapter')).toBeFocused();
-    await page.getByLabel('Name of the new chapter').fill('Balcony');
+    await chapter(page, 'Before').click();
     await page.locator('#up-gallery').setInputFiles(await writePhoto(await photoDir(testInfo), 'IMG_1.jpg', 'tvunit', { width: 640, height: 960 }));
     await expect(page.locator('#up-photo-status')).toHaveText('1 photo ready.', SLOW);
     await page.getByLabel('Caption for photo 1 (optional)').fill('Averyveryveryverylongcaptionwithoutanyspacesthatcouldpushthepagesideways');
@@ -319,7 +321,7 @@ test.describe('phone upload page', () => {
 
     await publish(page).click();
     await expect(page.locator('#up-done')).toBeFocused(SLOW);
-    expect(Object.keys(fake.files()).filter((p) => p.includes('/Balcony/'))).toEqual(['projects/project-1/Balcony/1-Averyveryveryverylongcaptionwithoutanyspacesthatcouldpushthe.jpg']);
+    expect(Object.keys(fake.files()).filter((p) => p.startsWith('images/project-1/before/1-'))).toEqual(['images/project-1/before/1-Averyveryveryverylongcaptionwithoutanyspacesthatcouldpushthe.jpg']);
     await expectNoSidewaysScroll(page);
     await expectBigTargets();
     await axe();
@@ -333,7 +335,7 @@ test.describe('phone upload page', () => {
     const door = await writePhoto(dir, 'IMG_2.jpg', 'door', { width: 900, height: 1200 });
     await page.goto('admin/');
     await expect(page.getByLabel('Project', { exact: true })).toHaveValue('new', SLOW);
-    await chapter(page, 'Painting').click();
+    await chapter(page, 'After').click();
     await page.locator('#up-gallery').setInputFiles([wall, door]);
     await expect(page.locator('#up-photo-status')).toHaveText('2 photos ready.', SLOW);
     await page.getByLabel('Caption for photo 1 (optional)').fill('Accent wall');
@@ -349,13 +351,13 @@ test.describe('phone upload page', () => {
     await expect(page.locator('img.up-thumb:visible')).toHaveCount(2);
     await expect(page.getByLabel('Caption for photo 1 (optional)')).toHaveValue('Accent wall');
     await expect(page.locator('.up-photo').nth(1).getByRole('checkbox', { name: 'Cover photo' })).toBeChecked();
-    await expect(page.locator('#up-chips input[value="painting"]')).toBeChecked();
+    await expect(page.locator('#up-chips input[value="after"]')).toBeChecked();
     await expect(page.getByLabel('Title', { exact: true })).toHaveValue('Kept on the phone');
     await publish(page).click();
     await expect(page.locator('#up-done-text')).toHaveText('Project 11 is saved with 2 photos. It will be on your website in about 2 minutes.', SLOW);
-    expect(fake.text('projects/project-11/info.txt')).toContain('Title: Kept on the phone\n');
-    expect(fake.text('projects/project-11/info.txt')).toContain('Cover: painting/2.jpg\n');
-    expect(Object.keys(fake.files()).filter((p) => p.startsWith('projects/project-11/painting/')).sort()).toEqual(['projects/project-11/painting/1-Accent wall.jpg', 'projects/project-11/painting/2.jpg']);
+    expect(fake.text('images/project-11/info.txt')).toContain('Title: Kept on the phone\n');
+    expect(fake.text('images/project-11/info.txt')).toContain('Cover: after/2.jpg\n');
+    expect(Object.keys(fake.files()).filter((p) => p.startsWith('images/project-11/after/')).sort()).toEqual(['images/project-11/after/1-Accent wall.jpg', 'images/project-11/after/2.jpg']);
 
     // Published photos aren't kept any more.
     await expect.poll(async () => (await keptOnPhone(page)).photos, SLOW).toBe(0);
@@ -364,7 +366,7 @@ test.describe('phone upload page', () => {
     await expect(page.locator('.up-photo')).toHaveCount(0);
 
     // "Clear all photos" removes waiting photos from the phone too.
-    await chapter(page, 'Woodwork').click();
+    await chapter(page, 'After').click();
     await page.locator('#up-gallery').setInputFiles(wall);
     await expect(page.locator('#up-photo-status')).toHaveText('1 photo ready.', SLOW);
     await expect.poll(async () => (await keptOnPhone(page)).photos, SLOW).toBe(1);
@@ -419,16 +421,16 @@ test.describe('phone upload page', () => {
     const project = page.getByLabel('Project', { exact: true });
     await project.selectOption('project-4');
     await expect(page.getByLabel('Title', { exact: true })).toHaveValue('Single photo', SLOW);
-    await chapter(page, 'Woodwork').click();
+    await chapter(page, 'After').click();
     await page.locator('#up-gallery').setInputFiles(await writePhoto(await photoDir(testInfo), 'shelf.jpg', 'wardrobe'));
     await expect(page.locator('#up-photo-status')).toHaveText('1 photo ready.', SLOW);
 
     // Meanwhile, on the computer, project-4 was renamed to project-14.
     const files = fake.files();
     const renamed = {};
-    for (const p of Object.keys(files).filter((name) => name.startsWith('projects/project-4/'))) {
+    for (const p of Object.keys(files).filter((name) => name.startsWith('images/project-4/'))) {
       renamed[p] = null;
-      renamed[p.replace('projects/project-4/', 'projects/project-14/')] = files[p];
+      renamed[p.replace('images/project-4/', 'images/project-14/')] = files[p];
     }
     fake.pushFromElsewhere(renamed);
     await publish(page).click();
@@ -443,7 +445,7 @@ test.describe('phone upload page', () => {
     await expect(page.getByLabel('Title', { exact: true })).toHaveValue('Single photo', SLOW);
     await publish(page).click();
     await expect(page.locator('#up-done-text')).toHaveText('1 photo saved to Project 14. It will be on your website in about 2 minutes.', SLOW);
-    expect(Object.keys(fake.files()).filter((p) => p.startsWith('projects/project-14/woodwork/')).sort()).toEqual(['projects/project-14/woodwork/1.jpg', 'projects/project-14/woodwork/broken.jpg', 'projects/project-14/woodwork/good.jpg']);
+    expect(Object.keys(fake.files()).filter((p) => p.startsWith('images/project-14/')).sort()).toEqual(['images/project-14/after/1.jpg', 'images/project-14/info.txt', 'images/project-14/woodwork/broken.jpg', 'images/project-14/woodwork/good.jpg']);
   });
 
   test('when the signal goes just as GitHub saves, the reopened page finds that save instead of saving twice', async ({ page }, testInfo) => {
@@ -451,7 +453,7 @@ test.describe('phone upload page', () => {
     const { fake } = await fakeGitHub(page);
     await page.goto('admin/');
     await expect(page.getByLabel('Project', { exact: true })).toHaveValue('new', SLOW);
-    await chapter(page, 'Repairs').click();
+    await chapter(page, 'Before').click();
     await page.locator('#up-gallery').setInputFiles(await writePhoto(await photoDir(testInfo), 'IMG_7.jpg', 'damaged'));
     await expect(page.locator('#up-photo-status')).toHaveText('1 photo ready.', SLOW);
     fake.loseAnswerTo = 'PATCH';
@@ -466,7 +468,7 @@ test.describe('phone upload page', () => {
     await publish(page).click();
     await expect(page.locator('#up-done-text')).toHaveText('Your last publish arrived after all. Project 11 is saved with 1 photo. It will be on your website in about 2 minutes.', SLOW);
     expect(fake.history()).toHaveLength(2);
-    expect(Object.keys(fake.files()).filter((p) => p.startsWith('projects/project-12/'))).toEqual([]);
+    expect(Object.keys(fake.files()).filter((p) => p.startsWith('images/project-12/'))).toEqual([]);
     await expect(page.locator('.up-photo')).toHaveCount(0);
   });
 

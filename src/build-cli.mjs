@@ -4,7 +4,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { build, sizeReport } from './build.mjs';
 import { hasHiddenData } from './photos.mjs';
-import { PHOTO_EXTS, walk } from './util.mjs';
+import { PHOTO_EXTS, PROJECTS_DIR, walk } from './util.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const siteUrl = process.env.SITE_URL || '';
@@ -19,7 +19,7 @@ if (base == null || base === '') {
 
 /** On GitHub: points out photos that reached the repository without being tidied (for example uploaded on github.com). */
 async function reportUntidiedPhotos() {
-  const files = [...(await walk(path.join(root, 'projects'))), ...(await walk(path.join(root, 'site')))];
+  const files = [...(await walk(path.join(root, PROJECTS_DIR))), ...(await walk(path.join(root, 'site')))];
   for (const file of files) {
     if (!PHOTO_EXTS.has(path.extname(file).toLowerCase())) continue;
     let hidden = false;

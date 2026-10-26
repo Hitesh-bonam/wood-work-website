@@ -8,8 +8,8 @@ test.describe('project page', () => {
     await expect(page.getByRole('heading', { level: 1 })).toHaveText('Kitchen & "Dining" <Room>');
     await expect(page.locator('.p-meta li')).toHaveText(['North', '10 days', 'Finished Sep 2026']);
     const nav = page.getByRole('navigation', { name: 'Chapters' });
-    await expect(nav.getByRole('link')).toHaveText(['Before/after', 'Woodwork', 'Painting', 'Team', 'Review', 'Price']);
-    await expect(page.locator('main section.chap h2')).toHaveText(['Before and after', 'Woodwork', 'Painting', 'Our team at work', 'What the client said', 'Price for this project']);
+    await expect(nav.getByRole('link')).toHaveText(['Before', 'Compare', 'Woodwork', 'Painting', 'Team', 'Review', 'Price']);
+    await expect(page.locator('main section.chap h2')).toHaveText(['Before', 'Before and after', 'Woodwork', 'Painting', 'Our team at work', 'What the client said', 'Price for this project']);
     await expect(nav.locator('[aria-current]')).toHaveCount(0);
     await nav.getByRole('link', { name: 'Painting' }).click();
     await expect(page.locator('#ch-painting h2')).toBeInViewport();
@@ -31,7 +31,7 @@ test.describe('project page', () => {
       await page.setViewportSize(size);
       await page.goto('project/1/');
       const nav = page.getByRole('navigation', { name: 'Chapters' });
-      for (const name of ['Painting', 'Team', 'Woodwork', 'Before/after']) {
+      for (const name of ['Painting', 'Team', 'Woodwork', 'Compare', 'Before']) {
         await nav.getByRole('link', { name }).click();
         await expect(nav.getByRole('link', { name }), `${name} at ${size.width}x${size.height}`).toHaveAttribute('aria-current', 'true');
         // Still the same chapter once the page has finished gliding and gone quiet.
@@ -54,7 +54,9 @@ test.describe('project page', () => {
     const box = await figure.locator('.ba-frame').boundingBox();
     await page.mouse.click(box.x + box.width * 0.75, box.y + box.height / 2);
     await expect(slider).toHaveValue('75');
-    await expect(page.locator('#ch-before-after .ptag')).toHaveText(['Before']);
+    // A before photo without a partner of the same name is shown in the Before chapter, not paired up.
+    await expect(page.locator('#ch-before-after [data-ba]')).toHaveCount(2);
+    await expect(page.locator('#ch-before .ptile a')).toHaveAttribute('aria-label', 'Open photo: Before: Extra corner, project 1');
   });
 
   test('scrolling with a finger over the before/after photo does not move the line', async ({ page }) => {
@@ -99,10 +101,16 @@ test.describe('project page', () => {
     await story.getByRole('button', { name: 'Pause' }).click();
     await expect(story.getByRole('button', { name: 'Play' })).toBeVisible();
     for (let i = 0; i < 3; i++) await page.keyboard.press('ArrowLeft');
+    // The story follows the page: the Before photo, then each before/after pair, then the other chapters.
     await expect(story.locator('.s-cap .v-ch')).toHaveText('Before');
+    await expect(story.locator('.s-cap')).toContainText('Extra corner');
+    await story.getByRole('button', { name: 'Next photo' }).click();
+    await expect(story.locator('.s-cap .v-ch')).toHaveText('Before');
+    await expect(story.locator('.s-cap')).toContainText('Hall');
     await story.getByRole('button', { name: 'Next photo' }).click();
     await expect(story.locator('.s-cap .v-ch')).toHaveText('After');
-    for (let i = 0; i < 10; i++) await page.keyboard.press('ArrowRight');
+    await expect(story.locator('.s-cap')).toContainText('Hall');
+    for (let i = 0; i < 9; i++) await page.keyboard.press('ArrowRight');
     const end = story.locator('.s-end');
     await expect(end).toBeVisible();
     await expect(end.getByRole('link', { name: 'Get a quote on WhatsApp' })).toHaveAttribute('href', /^https:\/\/wa\.me\/919000000001\?text=.*Project%201/);

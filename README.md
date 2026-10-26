@@ -1,31 +1,29 @@
 # Woodwork website
 
-Your showcase website. **Every folder inside `projects` becomes a project on the website.**
-Put photos in a folder and they appear on the site. You don't need to touch any code.
+Your showcase website. **All your photos go in the `images` folder.** Every project is one folder
+there, with just two folders inside: `before` and `after`. Put photos in them and they appear on the
+website by themselves. You never need to touch any code.
 
 ```
 wood work/
-├── projects/            ← YOUR WORK: one folder per project
+├── images/                 ← ALL YOUR PROJECT PHOTOS
 │   ├── project-1/
-│   │   ├── info.txt     ← title, area, days, price (all optional)
-│   │   ├── before/      ← before photos
-│   │   ├── after/       ← after photos (same names as in before/ = a slider)
-│   │   ├── woodwork/
-│   │   ├── painting/
-│   │   ├── repairs/
-│   │   ├── team/        ← your carpenters and painters at work
-│   │   ├── quality/     ← close-ups: joints, edges, hinges, finish
-│   │   └── materials/   ← the products used in this home
-│   ├── project-2/ ...
-│   └── _template/       ← copy this to start a new project
-├── site/                ← YOUR BUSINESS
-│   ├── business.txt     ← name, phone, WhatsApp, areas, hours
-│   ├── rates.txt        ← your rate card for the Pricing page
-│   ├── materials/       ← photos for the Materials page
-│   ├── team/            ← photos for "Our team" on the Contact page
-│   └── logo.png         ← optional: add your logo here
-├── PREVIEW.cmd          ← double-click: see the website on your computer
-└── PUBLISH.cmd          ← double-click: put your changes online
+│   │   ├── before/         ← photos of the home BEFORE the work (empty rooms, old walls)
+│   │   ├── after/          ← photos of the FINISHED work
+│   │   └── info.txt        ← optional: title, area, days, price
+│   ├── project-2/
+│   │   ├── before/
+│   │   └── after/
+│   ├── _template/          ← copy this to start a new project
+│   └── HOW TO ADD PHOTOS.txt
+├── site/                   ← YOUR BUSINESS
+│   ├── business.txt        ← name, phone, WhatsApp, areas, hours
+│   ├── rates.txt           ← your rate card for the Pricing page
+│   ├── materials/          ← photos for the Materials page
+│   ├── team/               ← photos for "Our team" on the Contact page
+│   └── logo.png            ← optional: add your logo here
+├── PREVIEW.cmd             ← double-click: see the website on your computer
+└── PUBLISH.cmd             ← double-click: put your changes online
 ```
 
 The folders `project-1` to `project-4` are **samples** with drawn pictures (marked "SAMPLE PHOTO").
@@ -33,45 +31,61 @@ Delete them once your real projects are in.
 
 ## Add a new project
 
-1. Copy the `projects/_template` folder and rename the copy to the next number, for example `project-5`.
-2. Put your photos into its folders. Leave a folder empty and that part simply isn't shown.
-3. Open `info.txt` and fill in what you want (everything is optional):
-   ```
-   Title: 3BHK full interior
-   Area: Green Park
-   Size: 3BHK, 1,850 sq ft
-   Days: 42
-   Finished: Sep 2026
-   Type: Full home, Wardrobes, Kitchens
+1. Copy the `images/_template` folder and rename the copy to the next number, for example `project-5`.
+2. Put the photos of the home **before** the work in its `before` folder, and photos of the
+   **finished** work in its `after` folder.
+3. Double-click `PREVIEW.cmd` to see it, then `PUBLISH.cmd` to put it online.
 
-   Price:
-   Wardrobes (3) = 1,92,000
-   Modular kitchen = 1,45,000
-   ```
-4. Double-click `PREVIEW.cmd` to check it, then `PUBLISH.cmd` to put it online.
+That's all. On the website the project shows its **Before** photos first, then its **After** photos,
+and the first after photo is its cover in the gallery. The highest number shows first, as
+"Project 5". Numbers never change, so you can tell a customer "look at project 3" and they will
+always find the same one.
 
-The highest number shows first, as "Project 5". Numbers never change, so you can tell a customer
-"look at project 3" and they will always find the same one.
+To add more photos to a project later, just put them in its `before` or `after` folder.
 
-A line like `Note: GST extra` is shown under the price. Capital letters in file names don't matter
-(`Info.txt` works too).
+### The order of the photos
+
+Photos show **in the same order as in the folder** when the folder is sorted by name (the usual
+view in File Explorer). Photos straight from a phone (`IMG_20261011_…`, `WhatsApp Image 2026-10-11 …`)
+are already in the order you took them. To choose the order yourself, start the names with numbers:
+`1 kitchen.jpg`, `2 hall.jpg`, … `10 balcony.jpg` (10 comes after 9, as you'd expect).
+
+### Optional: title, area and price (info.txt)
+
+Open the project's `info.txt` and fill in what you want. Everything is optional; without it the
+project simply shows as "Project 5".
+```
+Title: 3BHK full interior
+Area: Green Park
+Size: 3BHK, 1,850 sq ft
+Days: 42
+Finished: Sep 2026
+Type: Full home, Wardrobes, Kitchens
+
+Price:
+Wardrobes (3) = 1,92,000
+Modular kitchen = 1,45,000
+```
+A line like `Note: GST extra` is shown under the price. Capital letters in file and folder names don't
+matter (`Before`, `AFTER` and `Info.txt` all work).
 
 ### Photo tips
 
 - **Any photo from your phone works** (JPG, PNG, WebP or JFIF). Photos are automatically turned upright, made smaller for the web
   (a 5 MB phone photo becomes about 200 KB), and **the GPS location is removed** so your clients'
   addresses are never shared.
-- **The file name becomes the caption:** `01-master-wardrobe-sliding-doors.jpg` shows as
-  "Master wardrobe sliding doors". The number in front sets the order. Phone names like `IMG_2041.jpg`
-  are fine; they just show no caption.
-- **Before and after:** put the before photo in `before/` and the after photo in `after/` with the
-  **same name** (for example `kitchen.jpg` in both). The website shows a slider to compare them.
-- **Your own chapters:** make any folder, like `pooja room` or `balcony`, and it becomes its own chapter.
-- **A cover photo:** name a photo `cover.jpg` and put it directly in the project folder.
+- **The file name becomes the caption:** `master-wardrobe-sliding-doors.jpg` shows as
+  "Master wardrobe sliding doors". Phone names like `IMG_2041.jpg` are fine; they just show no caption.
+- **Optional slider:** give a before photo and an after photo the **same name** (for example
+  `kitchen.jpg` in both folders) and the website also shows the two side by side, with a line you
+  drag to compare. Photos with different names are never paired up.
+- **A different cover photo:** name a photo `cover.jpg` and put it directly in the project folder.
 - **iPhone HEIC photos** can't be shown on websites. On the iPhone choose
   Settings › Camera › Formats › Most Compatible, or send the photo to yourself on WhatsApp first.
 - **Videos** are too big for the website. Upload them to YouTube (unlisted is fine) and add the link
   to `info.txt`, like `Video: https://youtu.be/...`
+- **More folders (optional):** any other folder you make in a project, like `pooja room`, shows as
+  its own section after Before and After. You don't need this; `before` and `after` are enough.
 
 ## Change your business details and prices
 
@@ -112,7 +126,7 @@ something is broken, nothing changes online and the last good version stays up.
 ### Phone and computer are one project
 
 There is only one website and one GitHub repository. Photos added from your phone go straight into
-the same `projects/` folders on GitHub. PUBLISH.cmd and PREVIEW.cmd bring them down into this folder,
+the same `images/` folders on GitHub. PUBLISH.cmd and PREVIEW.cmd bring them down into this folder,
 and PUBLISH.cmd sends your computer's photos up, so both sides always end up with everything.
 
 If the same file was changed on both sides, PUBLISH.cmd stops and names the file. Nothing is lost:
@@ -121,7 +135,7 @@ give one of the photos a different name and run it again.
 ## Add photos from your phone
 
 At a job site you can add a new project, or more photos to a project, straight from your phone. No
-computer needed. The photos go into the same `projects/` folders on GitHub as the ones from your
+computer needed. The photos go into the same `images/` folders on GitHub as the ones from your
 computer, and your website updates about 2 minutes later.
 
 **The upload page** is your website's address with `admin/` at the end, for example
@@ -163,8 +177,8 @@ A key made by anyone else must first be approved in the organization's *Settings
 ### Adding photos
 
 1. **Which project?** Choose *New project* (the page shows its number) or an existing project.
-2. **What are the photos of?** Before, After, Woodwork, Painting, Repairs, Team at work, Quality close-ups,
-   Materials, Other photos, or a *New chapter* like "Pooja room".
+2. **Before or after the work?** *Before* puts the photos in the project's `before` folder (the home
+   before you started), *After* in its `after` folder (the finished work).
 3. **Add photos:** tap *Choose photos* (your gallery) or *Take a photo*. Type a caption if you like; it is
    shown under the photo on the website. Tick *Cover photo* on the photo you want in front.
 4. **Project details** are optional: title, area, days, price list and so on. For an existing project you
@@ -175,8 +189,9 @@ Good to know:
 
 - Before anything is sent, the phone makes each photo smaller (at most 2000 pixels) and **removes its
   GPS location**, because the repository is public.
-- **Before and after:** give each after photo the same caption as its before photo (the caption box
-  suggests them), or add them in the same order. The website then shows the slider.
+- Photos show on the website in the order you add them.
+- **Optional slider:** give an after photo the same caption as a before photo (the caption box
+  suggests them) and the website also shows the two side by side, with a line to drag.
 - **Photos wait on the phone until they're published,** with their captions and details, even if the
   page closes (no signal, the camera app, the phone low on memory). Open the page again and they're back;
   *Clear all photos* removes them.

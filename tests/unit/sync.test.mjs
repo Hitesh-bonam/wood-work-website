@@ -30,7 +30,7 @@ async function setup() {
   await fs.mkdir(computer);
   run(computer, 'init', '--quiet', '-b', 'main');
   identity(computer);
-  await writeText(computer, 'projects/project-1/info.txt', 'Title: First\n');
+  await writeText(computer, 'images/project-1/info.txt', 'Title: First\n');
   await writeText(computer, 'site/business.txt', 'Business name: Test\n');
   run(computer, 'add', '-A');
   run(computer, 'commit', '--quiet', '-m', 'start');
@@ -52,40 +52,40 @@ async function phoneUploads(phone, rel, text) {
 test('photos added from the phone come down to this computer when the preview starts', async () => {
   const { base, computer, phone } = await setup();
   assert.equal(pullLatest(computer).status, 'up-to-date');
-  await phoneUploads(phone, 'projects/project-2/woodwork/kitchen.jpg', 'photo from phone');
+  await phoneUploads(phone, 'images/project-2/woodwork/kitchen.jpg', 'photo from phone');
   const result = pullLatest(computer);
   assert.equal(result.status, 'updated');
   assert.match(result.message, /project-2/);
-  assert.ok(existsSync(path.join(computer, 'projects', 'project-2', 'woodwork', 'kitchen.jpg')));
+  assert.ok(existsSync(path.join(computer, 'images', 'project-2', 'woodwork', 'kitchen.jpg')));
   await fs.rm(base, { recursive: true, force: true });
 });
 
 test('publishing sends computer photos and keeps the phone photos: one project', async () => {
   const { base, github, computer, phone } = await setup();
-  await phoneUploads(phone, 'projects/project-2/woodwork/kitchen.jpg', 'photo from phone');
-  await writeText(computer, 'projects/project-1/woodwork/wardrobe.jpg', 'photo from computer');
+  await phoneUploads(phone, 'images/project-2/woodwork/kitchen.jpg', 'photo from phone');
+  await writeText(computer, 'images/project-1/woodwork/wardrobe.jpg', 'photo from computer');
   const messages = [];
   assert.equal(publish(computer, (m) => messages.push(m)), true, messages.join('\n'));
   const online = run(base, `--git-dir=${github}`, 'ls-tree', '-r', '--name-only', 'main').split('\n');
-  assert.ok(online.includes('projects/project-1/woodwork/wardrobe.jpg'));
-  assert.ok(online.includes('projects/project-2/woodwork/kitchen.jpg'));
-  assert.ok(existsSync(path.join(computer, 'projects', 'project-2', 'woodwork', 'kitchen.jpg')));
+  assert.ok(online.includes('images/project-1/woodwork/wardrobe.jpg'));
+  assert.ok(online.includes('images/project-2/woodwork/kitchen.jpg'));
+  assert.ok(existsSync(path.join(computer, 'images', 'project-2', 'woodwork', 'kitchen.jpg')));
   assert.ok(messages.some((m) => m.includes('project-2')));
   assert.ok(messages.at(-1).startsWith('Done.'));
   assert.equal(pullLatest(phone).status, 'updated');
-  assert.ok(existsSync(path.join(phone, 'projects', 'project-1', 'woodwork', 'wardrobe.jpg')));
+  assert.ok(existsSync(path.join(phone, 'images', 'project-1', 'woodwork', 'wardrobe.jpg')));
   await fs.rm(base, { recursive: true, force: true });
 });
 
 test('the same file changed on both sides is reported and nothing is lost', async () => {
   const { base, computer, phone } = await setup();
-  await phoneUploads(phone, 'projects/project-1/info.txt', 'Title: Changed on the phone\n');
-  await writeText(computer, 'projects/project-1/info.txt', 'Title: Changed on the computer\n');
+  await phoneUploads(phone, 'images/project-1/info.txt', 'Title: Changed on the phone\n');
+  await writeText(computer, 'images/project-1/info.txt', 'Title: Changed on the computer\n');
   const messages = [];
   assert.equal(publish(computer, (m) => messages.push(m)), false);
-  assert.ok(messages.some((m) => m.includes('projects/project-1/info.txt')), messages.join('\n'));
+  assert.ok(messages.some((m) => m.includes('images/project-1/info.txt')), messages.join('\n'));
   assert.equal(existsSync(path.join(computer, '.git', 'rebase-merge')) || existsSync(path.join(computer, '.git', 'rebase-apply')), false);
-  assert.equal(await fs.readFile(path.join(computer, 'projects', 'project-1', 'info.txt'), 'utf8'), 'Title: Changed on the computer\n');
+  assert.equal(await fs.readFile(path.join(computer, 'images', 'project-1', 'info.txt'), 'utf8'), 'Title: Changed on the computer\n');
   assert.equal(run(computer, 'log', '-1', '--format=%s'), 'Update projects and photos');
   await fs.rm(base, { recursive: true, force: true });
 });

@@ -1,0 +1,29 @@
+HOW TO ADD YOUR PHOTOS
+======================
+
+Every project is one folder in here, with two folders inside:
+
+  images
+    project-1
+      before     <- photos of the home BEFORE the work (empty rooms, old walls)
+      after      <- photos of the FINISHED work
+    project-2
+      before
+      after
+
+To add a new project:
+  1. Copy the folder "_template" and rename the copy to the next number, like "project-5".
+  2. Put photos in its "before" folder and its "after" folder.
+  3. That's all. To see it, double-click PREVIEW.cmd. To put it online, double-click PUBLISH.cmd.
+
+Good to know:
+  - Photos show on the website in the same order as in the folder (sorted by name). Phone photos
+    (IMG_2026...) are already in the order you took them. To choose the order yourself, start the
+    names with 1, 2, 3, like "1 kitchen.jpg", "2 hall.jpg".
+  - A name like "master-wardrobe.jpg" is shown under the photo as "Master wardrobe".
+  - The highest number shows first on the website: project-5 comes before project-1.
+  - info.txt (optional) is for the title, area and price of the project.
+  - Optional: give a before photo and an after photo the same name (kitchen.jpg in both folders) and
+    the website shows them as a slider you can drag to compare.
+  - Folders whose names start with _ are ignored.
+  - project-1 to project-4 are SAMPLES with drawn pictures. Delete them once your real projects are in.

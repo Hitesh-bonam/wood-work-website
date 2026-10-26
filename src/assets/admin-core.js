@@ -114,7 +114,7 @@
     const byFolder = new Map();
     for (const entry of entries) {
       const parts = String(entry.path).split('/');
-      if (parts[0] !== 'projects' || parts.length < 3) continue;
+      if (parts[0] !== config.dir || parts.length < 3) continue;
       const folder = parts[1];
       if (!folder || isHiddenName(folder) || /^templates?$/i.test(folder)) continue;
       if (!byFolder.has(folder)) byFolder.set(folder, { rootFiles: [], filesIn: new Map(), names: [] });
@@ -142,7 +142,7 @@
       return {
         folder,
         num,
-        info: info ? { path: `projects/${folder}/${info.name}`, sha: info.sha } : null,
+        info: info ? { path: `${config.dir}/${folder}/${info.name}`, sha: info.sha } : null,
         dirs: [...p.filesIn.keys()].filter((dir) => !isHiddenName(dir)).sort(naturalCompare),
         filesIn: p.filesIn,
         names: p.names,
@@ -457,7 +457,7 @@
     return out.join(scan.eol);
   }
 
-  /** info.txt for a new project, laid out like projects/_template/info.txt. */
+  /** info.txt for a new project, laid out like images/_template/info.txt. */
   function newInfo(values) {
     const v = (name) => oneLine(values[name]);
     const line = (name) => (v(name) ? `${FIELD_LABELS[name]}: ${v(name)}` : `${FIELD_LABELS[name]}:`);
@@ -501,7 +501,7 @@
     let info = null;
     const changed = Object.keys(changes).length > 0;
     if (isNew || (changed && !project.info)) {
-      info = { path: `projects/${project.folder}/info.txt`, text: newInfo(changes) };
+      info = { path: `${config.dir}/${project.folder}/info.txt`, text: newInfo(changes) };
     } else if (changed) {
       if (infoText == null) throw new UploadError('unexpected', 'info.txt was not read');
       const text = updateInfo(infoText, changes, config);
@@ -519,7 +519,7 @@
       num: project.num,
       chapterFolder: folder,
       names,
-      paths: names.map((name) => `projects/${project.folder}/${folder}/${name}`),
+      paths: names.map((name) => `${config.dir}/${project.folder}/${folder}/${name}`),
       info,
       message,
     };
@@ -739,7 +739,7 @@
     const projectFolders = new Set(listProjects(files, config).projects.map((p) => p.folder));
     for (const file of files) {
       const parts = file.path.split('/');
-      if (parts[0] === 'projects' && projectFolders.has(parts[1]) && !known.has(file.sha)) known.set(file.sha, file.path);
+      if (parts[0] === config.dir && projectFolders.has(parts[1]) && !known.has(file.sha)) known.set(file.sha, file.path);
     }
     let already = null;
     if (photos.length && photos.every((p) => p.sha && known.has(p.sha))) {

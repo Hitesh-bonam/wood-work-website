@@ -6,6 +6,7 @@ import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { PROJECTS_DIR } from './util.mjs';
 
 function git(cwd, args, { inherit = false, timeout = 120_000 } = {}) {
   const result = spawnSync('git', args, { cwd, encoding: 'utf8', timeout, stdio: inherit ? 'inherit' : 'pipe', windowsHide: true });
@@ -14,9 +15,9 @@ function git(cwd, args, { inherit = false, timeout = 120_000 } = {}) {
 
 const lines = (text) => text.split(/\r?\n/).map((s) => s.trim()).filter(Boolean);
 
-/** "projects/project-5/woodwork/a.jpg" → "project-5" (for friendly summaries). */
+/** "images/project-5/after/a.jpg" → "project-5" (for friendly summaries). */
 function projectsIn(files) {
-  return [...new Set(files.filter((f) => f.startsWith('projects/')).map((f) => f.split('/')[1]).filter(Boolean))];
+  return [...new Set(files.filter((f) => f.startsWith(`${PROJECTS_DIR}/`)).map((f) => f.split('/')[1]).filter(Boolean))];
 }
 
 function rebaseInProgress(cwd) {
@@ -68,7 +69,7 @@ export function pullLatest(cwd) {
   return { status: 'blocked', message: `Couldn't bring in the changes from GitHub: ${lines(pulled.err)[0] || 'unknown problem'}`, files: [] };
 }
 
-/** Saves projects/ and site/, brings down phone uploads, then sends everything to GitHub. */
+/** Saves images/ and site/, brings down phone uploads, then sends everything to GitHub. */
 export function publish(cwd, log = console.log) {
   if (!git(cwd, ['remote', 'get-url', 'origin']).ok) {
     log('This folder is not connected to GitHub yet. See "Put the website online" in README.md.');
@@ -79,7 +80,7 @@ export function publish(cwd, log = console.log) {
     return false;
   }
   log('Saving your projects and photos...');
-  const folders = ['projects', 'site'].filter((name) => fs.existsSync(path.join(cwd, name)));
+  const folders = [PROJECTS_DIR, 'site'].filter((name) => fs.existsSync(path.join(cwd, name)));
   if (folders.length) git(cwd, ['add', '-A', '--', ...folders]);
   if (!git(cwd, ['diff', '--cached', '--quiet']).ok) {
     if (!git(cwd, ['commit', '--quiet', '-m', 'Update projects and photos'], { inherit: true }).ok) {

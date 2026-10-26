@@ -27,7 +27,7 @@ export function icon(name) {
 export const DEFAULT_FAVICON = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%238A5A2B'/%3E%3Cpath d='M15 22h34M15 32h34M15 42h34' stroke='%23F5ECE1' stroke-width='5' stroke-linecap='round'/%3E%3C/svg%3E";
 const TILE_SIZES = '(min-width: 1180px) 190px, (min-width: 1024px) 16vw, (min-width: 640px) 19vw, 24vw';
 const BA_SIZES = '(min-width: 960px) 900px, 100vw';
-const NAV_SHORT = { 'before-after': 'Before/after', team: 'Team', quality: 'Quality', materials: 'Materials' };
+const NAV_SHORT = { 'before-after': 'Compare', team: 'Team', quality: 'Quality', materials: 'Materials' };
 
 function helpers(ctx) {
   const b = ctx.business;
@@ -45,7 +45,9 @@ function helpers(ctx) {
   const projectName = (p) => (p.num ? (p.title ? `Project ${p.num} · ${p.title}` : `Project ${p.num}`) : p.title || p.folderTitle);
   const ref = (p) => (p.num ? `project ${p.num}` : projectName(p));
   const alt = (p, project) => {
-    const what = p.caption ? (p.label ? `${p.label}: ${p.caption}` : p.caption) : p.chapterTitle ? `${p.chapterTitle} photo` : 'Photo';
+    // A before or after photo says so, wherever it is shown (the gallery, the viewer, the story).
+    const tag = p.label || (['Before', 'After'].includes(p.chapterTitle) ? p.chapterTitle : '');
+    const what = p.caption ? (tag ? `${tag}: ${p.caption}` : p.caption) : p.chapterTitle ? `${p.chapterTitle} photo` : 'Photo';
     return project ? `${what}, ${ref(project)}` : what;
   };
   return {

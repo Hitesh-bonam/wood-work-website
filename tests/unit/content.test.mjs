@@ -22,15 +22,15 @@ const project = (num) => content.projects.find((p) => p.num === num);
 test('projects are numbered from their folder names and shown newest first', () => {
   assert.deepEqual(content.projects.map((p) => p.num), [10, 4, 2, 1, null]);
   assert.deepEqual(content.projects.map((p) => p.slug), ['10', '4', '2', '1', 'new-villa']);
-  assert.ok(warnings.some((w) => w.includes('"projects/new villa" has no number, so it is shown at the end') && w.includes('project-11')));
+  assert.ok(warnings.some((w) => w.includes('"images/new villa" has no number, so it is shown at the end') && w.includes('project-11')));
 });
 
 test('a folder without a number never changes the numbers of the others', async () => {
   const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'ww-numbers-'));
-  await writePhoto(dir, 'projects/project-1/woodwork/a.jpg', 'wardrobe');
-  await writePhoto(dir, 'projects/project-1 copy/woodwork/a.jpg', 'wardrobe');
-  await writePhoto(dir, 'projects/Kondapur villa/woodwork/a.jpg', 'wardrobe');
-  await writePhoto(dir, 'projects/పూజ/woodwork/a.jpg', 'wardrobe');
+  await writePhoto(dir, 'images/project-1/woodwork/a.jpg', 'wardrobe');
+  await writePhoto(dir, 'images/project-1 copy/woodwork/a.jpg', 'wardrobe');
+  await writePhoto(dir, 'images/Kondapur villa/woodwork/a.jpg', 'wardrobe');
+  await writePhoto(dir, 'images/పూజ/woodwork/a.jpg', 'wardrobe');
   const w = [];
   const c = await loadContent(dir, (m) => w.push(m));
   assert.deepEqual(c.projects.map((p) => [p.num, p.slug, p.folderTitle]), [
@@ -44,7 +44,7 @@ test('a folder without a number never changes the numbers of the others', async 
   // Every folder without a number gets its own suggestion, so following all the tips gives no clashes.
   const tips = w.map((m) => (m.match(/"project-(\d+)"/) || [])[1]).filter(Boolean);
   assert.deepEqual(tips.sort(), ['2', '3', '4']);
-  await writePhoto(dir, 'projects/project-7/woodwork/a.jpg', 'wardrobe');
+  await writePhoto(dir, 'images/project-7/woodwork/a.jpg', 'wardrobe');
   const c2 = await loadContent(dir, () => {});
   assert.deepEqual(c2.projects.map((p) => p.slug), ['7', '1', 'kondapur-villa', 'project-1-copy', c.projects[3].slug]);
   await fs.rm(dir, { recursive: true, force: true });
@@ -53,20 +53,45 @@ test('a folder without a number never changes the numbers of the others', async 
 test('folders that start with _ and projects without usable photos are left out', () => {
   assert.equal(content.projects.some((p) => p.folder === '_template'), false);
   assert.equal(project(3), undefined);
-  assert.ok(warnings.some((w) => w.includes('projects/project-3 has no photos yet')));
+  assert.ok(warnings.some((w) => w.includes('images/project-3 has no photos yet')));
   assert.ok(warnings.some((w) => w.includes('photo.heic') && w.includes('HEIC')));
   assert.ok(warnings.some((w) => w.includes('video.mp4') && w.includes('YouTube')));
 });
 
-test('chapters follow the story order and before/after photos pair up by name', () => {
+test('chapters follow the story order and before/after photos with the same name become sliders', () => {
   const p = project(1);
-  assert.deepEqual(p.chapters.map((c) => c.key), ['before-after', 'woodwork', 'painting', 'team']);
-  const ba = p.chapters[0];
+  assert.deepEqual(p.chapters.map((c) => c.key), ['before', 'before-after', 'woodwork', 'painting', 'team']);
+  assert.deepEqual(p.chapters[0].photos.map((photo) => [photo.name, photo.chapterTitle]), [['extra-corner.jpg', 'Before']]);
+  const ba = p.chapters[1];
   assert.deepEqual(ba.pairs.map((pair) => [pair.before.name, pair.after.name]), [['hall.jpg', 'hall.jpg'], ['kitchen.jpg', 'kitchen.jpg']]);
-  assert.deepEqual(ba.photos.map((photo) => [photo.name, photo.label]), [['extra-corner.jpg', 'Before']]);
+  assert.deepEqual(ba.photos, []);
   assert.equal(p.allPhotos.length, 11);
-  assert.deepEqual(p.chapters[1].photos.map((photo) => photo.name), ['01-tall-unit.jpg', '03-tv-unit.png', 'IMG_20261012_101010.jpg']);
-  assert.deepEqual(p.chapters[1].photos.map((photo) => photo.caption), ['Tall unit', 'TV unit', '']);
+  assert.deepEqual(p.chapters[2].photos.map((photo) => photo.name), ['01-tall-unit.jpg', '03-tv-unit.png', 'IMG_20261012_101010.jpg']);
+  assert.deepEqual(p.chapters[2].photos.map((photo) => photo.caption), ['Tall unit', 'TV unit', '']);
+});
+
+test('a project with just a before and an after folder shows them in folder order, with nothing guessed', async () => {
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'ww-simple-'));
+  try {
+    // Phone names and plain numbers, three photos on each side: none of them belong together.
+    for (const rel of ['Before/IMG_20261001_101500.jpg', 'Before/WhatsApp Image 2026-10-01 at 09.00.00.jpeg', 'Before/IMG_20261001_100000.jpg', 'AFTER/10.jpg', 'AFTER/2.jpg', 'AFTER/1.jpg']) {
+      await writePhoto(dir, `images/project-7/${rel}`, 'wardrobe', { width: 120, height: 90 });
+    }
+    const w = [];
+    const [p] = (await loadContent(dir, (m) => w.push(m))).projects;
+    assert.equal(p.num, 7);
+    assert.equal(p.title, '');
+    assert.deepEqual(p.chapters.map((c) => [c.key, c.title]), [['before', 'Before'], ['after', 'After']]);
+    assert.deepEqual(p.chapters[0].photos.map((photo) => photo.name), ['IMG_20261001_100000.jpg', 'IMG_20261001_101500.jpg', 'WhatsApp Image 2026-10-01 at 09.00.00.jpeg']);
+    assert.deepEqual(p.chapters[1].photos.map((photo) => photo.name), ['1.jpg', '2.jpg', '10.jpg']);
+    // The cover and the gallery show the finished work first; the story goes from before to after.
+    assert.equal(p.cover.name, '1.jpg');
+    assert.deepEqual(p.row.map((photo) => photo.name), ['1.jpg', '2.jpg', '10.jpg', 'IMG_20261001_100000.jpg', 'IMG_20261001_101500.jpg']);
+    assert.deepEqual(p.allPhotos.map((photo) => photo.chapterTitle), ['Before', 'Before', 'Before', 'After', 'After', 'After']);
+    assert.deepEqual(w.filter((m) => !m.includes('business.txt')), []);
+  } finally {
+    await fs.rm(dir, { recursive: true, force: true });
+  }
 });
 
 test('project details, price and types are read from info.txt', () => {
@@ -79,7 +104,7 @@ test('project details, price and types are read from info.txt', () => {
   assert.equal(p.review, 'Very good work.');
   assert.deepEqual(p.price.items, [{ item: 'Cabinets', amount: 120000 }, { item: 'Paint', amount: 30000 }, { item: 'Hardware', amount: 15000 }]);
   assert.equal(p.price.total, 165000);
-  assert.ok(warnings.some((w) => w.includes('projects/project-1/info.txt line') && w.includes('this line is wrong')));
+  assert.ok(warnings.some((w) => w.includes('images/project-1/info.txt line') && w.includes('this line is wrong')));
 });
 
 test('a project with no info.txt uses its cover photo and loose photos', () => {
@@ -149,11 +174,11 @@ test('capital letters, doubled extensions, camera names and odd lines are all ha
   await writeText(dir, 'site/Business.TXT', 'Business name: Caps Co\nPhone: 98765 43210 / 99887 76655\nWhatsApp: 98765 43210\nCurrency: Rs\n');
   await writeText(dir, 'site/rates.txt.txt', 'Doors = 2500 per doors\nPolish = Rs 40 per sq ft\n');
   await writePhoto(dir, 'site/LOGO.PNG', 'plywood', { width: 600, height: 200 });
-  await writeText(dir, 'projects/project-1/Info.TXT', 'Title: Caps\nPrice:\nWardrobes = 1,92,000\nNote: GST extra\nKitchen = 1,45,000\nTitel: a typo\n');
-  await writePhoto(dir, 'projects/project-1/woodwork/_DSC1234.JPG', 'wardrobe');
-  await writePhoto(dir, 'projects/project-1/woodwork/photo.jfif', 'kitchen');
-  await writeText(dir, 'projects/project-1/woodwork/quote.pdf', 'not a photo');
-  await writePhoto(dir, 'projects/project-1/3D wall panels/01-panel.jpg', 'tvunit');
+  await writeText(dir, 'images/project-1/Info.TXT', 'Title: Caps\nPrice:\nWardrobes = 1,92,000\nNote: GST extra\nKitchen = 1,45,000\nTitel: a typo\n');
+  await writePhoto(dir, 'images/project-1/woodwork/_DSC1234.JPG', 'wardrobe');
+  await writePhoto(dir, 'images/project-1/woodwork/photo.jfif', 'kitchen');
+  await writeText(dir, 'images/project-1/woodwork/quote.pdf', 'not a photo');
+  await writePhoto(dir, 'images/project-1/3D wall panels/01-panel.jpg', 'tvunit');
   const w = [];
   const c = await loadContent(dir, (m) => w.push(m));
   const p = c.projects[0];
@@ -194,7 +219,7 @@ test('a missing site folder and an empty projects folder do not break anything',
   assert.deepEqual(c.projects, []);
   assert.equal(c.business.name, 'Your business name');
   assert.ok(w.some((m) => m.includes('site/business.txt is missing')));
-  await writePhoto(dir, 'projects/project-1/WOODWORK/Nested/Deeper/01-shelf.JPG', 'wardrobe');
+  await writePhoto(dir, 'images/project-1/WOODWORK/Nested/Deeper/01-shelf.JPG', 'wardrobe');
   const c2 = await loadContent(dir, () => {});
   assert.equal(c2.projects[0].chapters[0].key, 'woodwork');
   assert.equal(c2.projects[0].allPhotos[0].caption, 'Shelf');
@@ -204,12 +229,12 @@ test('a missing site folder and an empty projects folder do not break anything',
 test('a cover written with its folder is that exact photo; a bare name prefers photos that are not before photos', async () => {
   const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'ww-cover-'));
   try {
-    for (const rel of ['before/2.jpg', 'woodwork/2.jpg', 'painting/2.jpg']) await writeText(dir, `projects/project-1/${rel}`, 'x');
+    for (const rel of ['before/2.jpg', 'woodwork/2.jpg', 'painting/2.jpg']) await writeText(dir, `images/project-1/${rel}`, 'x');
     const coverFor = async (line) => {
-      await writeText(dir, 'projects/project-1/info.txt', `Title: Cover test\n${line}\n`);
+      await writeText(dir, 'images/project-1/info.txt', `Title: Cover test\n${line}\n`);
       const w = [];
       const [p] = (await loadContent(dir, (m) => w.push(m))).projects;
-      return { cover: path.relative(path.join(dir, 'projects', 'project-1'), p.cover.file).split(path.sep).join('/'), warned: w.some((m) => m.includes('cover photo')) };
+      return { cover: path.relative(path.join(dir, 'images', 'project-1'), p.cover.file).split(path.sep).join('/'), warned: w.some((m) => m.includes('cover photo')) };
     };
     assert.deepEqual(await coverFor('Cover: painting/2.jpg'), { cover: 'painting/2.jpg', warned: false });
     assert.deepEqual(await coverFor('Cover: Painting/2'), { cover: 'painting/2.jpg', warned: false });
@@ -227,16 +252,17 @@ test('a cover written with its folder is that exact photo; a bare name prefers p
 test('before and after photos pair by name even when only the number in front differs', async () => {
   const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'ww-pairs-'));
   try {
-    for (const rel of ['before/01-kitchen.jpg', 'before/02.jpg', 'before/hall.jpg', 'before/2bhk-bedroom.jpg', 'after/2.jpg', 'after/1-Kitchen.jpg', 'after/03-hall.jpg', 'after/bhk-bedroom.jpg', 'after/extra-corner.jpg']) {
-      await writeText(dir, `projects/project-1/${rel}`, 'x');
+    for (const rel of ['before/01-kitchen.jpg', 'before/02.jpg', 'before/hall.jpg', 'before/2bhk-bedroom.jpg', 'before/1-before.jpg', 'after/2.jpg', 'after/1-Kitchen.jpg', 'after/03-hall.jpg', 'after/bhk-bedroom.jpg', 'after/extra-corner.jpg', 'after/1-after.jpg']) {
+      await writeText(dir, `images/project-1/${rel}`, 'x');
     }
     const [p] = (await loadContent(dir, () => {})).projects;
     const ba = p.chapters.find((c) => c.key === 'before-after');
     const pairs = ba.pairs.map((pair) => `${pair.before.name} ↔ ${pair.after.name}`).sort();
-    assert.deepEqual(pairs, ['01-kitchen.jpg ↔ 1-Kitchen.jpg', '02.jpg ↔ 2.jpg', 'hall.jpg ↔ 03-hall.jpg']);
-    // "2bhk" is part of the name, not an order number, so it doesn't pair with "bhk-bedroom" by name
-    // (and with one photo left over on one side and two on the other, nothing pairs by order either).
-    assert.deepEqual(ba.photos.map((photo) => `${photo.label}: ${photo.name}`), ['Before: 2bhk-bedroom.jpg', 'After: bhk-bedroom.jpg', 'After: extra-corner.jpg']);
+    assert.deepEqual(pairs, ['01-kitchen.jpg ↔ 1-Kitchen.jpg', '1-before.jpg ↔ 1-after.jpg', 'hall.jpg ↔ 03-hall.jpg']);
+    // "02.jpg" and "2.jpg" are only numbers, there to set the order, so they are different photos.
+    // "2bhk" is part of the name, not an order number, so it doesn't pair with "bhk-bedroom".
+    assert.deepEqual(p.chapters.find((c) => c.key === 'before').photos.map((photo) => photo.name), ['02.jpg', '2bhk-bedroom.jpg']);
+    assert.deepEqual(p.chapters.find((c) => c.key === 'after').photos.map((photo) => photo.name), ['2.jpg', 'bhk-bedroom.jpg', 'extra-corner.jpg']);
   } finally {
     await fs.rm(dir, { recursive: true, force: true });
   }

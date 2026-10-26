@@ -12,7 +12,7 @@ sharp.cache(false);
 const VERSION = 'v1';
 export const SMALL = 600;
 export const LARGE = 1600;
-/** Originals in projects/ are shrunk to this size so the GitHub repository stays small. */
+/** Originals in images/ are shrunk to this size so the GitHub repository stays small. */
 export const SOURCE_MAX = 2000;
 
 async function exists(file) {

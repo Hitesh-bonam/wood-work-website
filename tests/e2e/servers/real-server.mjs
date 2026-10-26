@@ -1,4 +1,4 @@
-// Builds the real website (your projects/ and site/ folders) into a test folder and serves it.
+// Builds the real website (your images/ and site/ folders) into a test folder and serves it.
 // Your photos are only read, never changed.
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';

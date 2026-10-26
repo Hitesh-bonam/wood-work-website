@@ -41,7 +41,7 @@ async function websiteProjects(files) {
 
 /** What the website shows for an info.txt (with one photo next to it). */
 async function shown(infoText) {
-  const { projects } = await websiteProjects({ 'projects/project-1/info.txt': infoText, 'projects/project-1/woodwork/01-a.jpg': 'x' });
+  const { projects } = await websiteProjects({ 'images/project-1/info.txt': infoText, 'images/project-1/woodwork/01-a.jpg': 'x' });
   const p = projects[0];
   return { title: p.title, area: p.area, size: p.size, days: p.days, finished: p.finished, types: p.types, about: p.about, review: p.review, reviewBy: p.reviewBy, videoId: p.videoId, videoUrl: p.videoUrl, price: p.price };
 }
@@ -64,9 +64,9 @@ test('captions, camera names and prices are read exactly like the website reads 
 
 test('projects are numbered from the files on GitHub exactly like the website numbers them', async () => {
   const folders = ['project-1', 'project-2', 'Project 10', 'p7', 'proj-003', 'new villa', '12 kitchen', 'project-1 copy', 'Templates', '_template', '.hidden', '~old'];
-  const files = Object.fromEntries(folders.map((f) => [`projects/${f}/woodwork/01-a.jpg`, 'x']));
+  const files = Object.fromEntries(folders.map((f) => [`images/${f}/woodwork/01-a.jpg`, 'x']));
   const { projects } = await websiteProjects(files);
-  const state = core.listProjects(entries([...Object.keys(files), 'projects/README.txt', 'site/business.txt', 'README.md']), config);
+  const state = core.listProjects(entries([...Object.keys(files), 'images/README.txt', 'site/business.txt', 'README.md']), config);
   const website = Object.fromEntries(projects.map((p) => [p.folder, p.num]));
   assert.deepEqual(Object.fromEntries(state.projects.map((p) => [p.folder, p.num])), website);
   assert.equal(state.next, Math.max(...projects.map((p) => p.num || 0)) + 1);
@@ -118,25 +118,25 @@ test('new photos are named so the website shows the typed caption, and names are
 
 test('photos go into the project\'s own chapter folders and continue their numbering', () => {
   const state = core.listProjects(entries([
-    'projects/project-2/info.txt',
-    'projects/project-2/1-Wood work/01-a.jpg',
-    'projects/project-2/1-Wood work/02-b.jpg',
-    'projects/project-2/1-Wood work/IMG_1234.jpg',
-    'projects/project-2/1-Wood work/20261012_101010.jpg',
-    'projects/project-2/1-Wood work/old/09-deep.jpg',
-    'projects/project-2/Pooja Room/1.jpg',
-    'projects/project-2/_drafts/1.jpg',
+    'images/project-2/info.txt',
+    'images/project-2/1-Wood work/01-a.jpg',
+    'images/project-2/1-Wood work/02-b.jpg',
+    'images/project-2/1-Wood work/IMG_1234.jpg',
+    'images/project-2/1-Wood work/20261012_101010.jpg',
+    'images/project-2/1-Wood work/old/09-deep.jpg',
+    'images/project-2/Pooja Room/1.jpg',
+    'images/project-2/_drafts/1.jpg',
   ]), config);
   const project = state.projects[0];
   assert.deepEqual(project.dirs, ['1-Wood work', 'Pooja Room']);
   const plan = (chapter, photos) => core.planUpload({ state, request: { project: 'project-2', chapter, photos, changes: {} }, config });
-  assert.deepEqual(plan({ key: 'woodwork' }, [{ caption: 'Shelf' }, { caption: '' }]).paths, ['projects/project-2/1-Wood work/3-Shelf.jpg', 'projects/project-2/1-Wood work/4.jpg']);
-  assert.deepEqual(plan({ key: 'custom', name: 'pooja room' }, [{ caption: '' }]).paths, ['projects/project-2/Pooja Room/2.jpg']);
-  assert.deepEqual(plan({ key: 'dir:Pooja Room' }, [{ caption: 'Bells' }]).paths, ['projects/project-2/Pooja Room/2-Bells.jpg']);
-  assert.deepEqual(plan({ key: 'custom', name: ' 2 - Wood work ' }, [{ caption: '' }]).paths, ['projects/project-2/1-Wood work/3.jpg']);
-  assert.deepEqual(plan({ key: 'custom', name: '_Balcony/../x:' }, [{ caption: '' }]).paths, ['projects/project-2/Balcony .. x/1.jpg']);
-  assert.deepEqual(plan({ key: 'painting' }, [{ caption: '' }]).paths, ['projects/project-2/painting/1.jpg']);
-  assert.deepEqual(plan({ key: 'photos' }, [{ caption: '' }]).paths, ['projects/project-2/photos/1.jpg']);
+  assert.deepEqual(plan({ key: 'woodwork' }, [{ caption: 'Shelf' }, { caption: '' }]).paths, ['images/project-2/1-Wood work/3-Shelf.jpg', 'images/project-2/1-Wood work/4.jpg']);
+  assert.deepEqual(plan({ key: 'custom', name: 'pooja room' }, [{ caption: '' }]).paths, ['images/project-2/Pooja Room/2.jpg']);
+  assert.deepEqual(plan({ key: 'dir:Pooja Room' }, [{ caption: 'Bells' }]).paths, ['images/project-2/Pooja Room/2-Bells.jpg']);
+  assert.deepEqual(plan({ key: 'custom', name: ' 2 - Wood work ' }, [{ caption: '' }]).paths, ['images/project-2/1-Wood work/3.jpg']);
+  assert.deepEqual(plan({ key: 'custom', name: '_Balcony/../x:' }, [{ caption: '' }]).paths, ['images/project-2/Balcony .. x/1.jpg']);
+  assert.deepEqual(plan({ key: 'painting' }, [{ caption: '' }]).paths, ['images/project-2/painting/1.jpg']);
+  assert.deepEqual(plan({ key: 'photos' }, [{ caption: '' }]).paths, ['images/project-2/photos/1.jpg']);
   assert.throws(() => plan(null, [{ caption: '' }]), (err) => err.kind === 'chapter');
   assert.throws(() => plan({ key: 'custom', name: '  ' }, [{ caption: '' }]), (err) => err.kind === 'chapter-name');
   assert.throws(() => core.planUpload({ state, request: { project: 'project-9', chapter: { key: 'woodwork' }, photos: [{}], changes: {} }, config }), (err) => err.kind === 'gone');
@@ -144,7 +144,7 @@ test('photos go into the project\'s own chapter folders and continue their numbe
 
 test('an after photo with the same caption as a before photo gets its name, so the website shows a slider', async () => {
   const before = ['01-Kitchen wall.jpg', '02-hall.jpg', 'extra-corner.jpg'];
-  const files = Object.fromEntries(before.map((n) => [`projects/project-5/before/${n}`, 'x']));
+  const files = Object.fromEntries(before.map((n) => [`images/project-5/before/${n}`, 'x']));
   const state = core.listProjects(entries(Object.keys(files)), config);
   const project = state.projects[0];
   assert.deepEqual(core.partnerCaptions(project, 'after', config), ['Kitchen wall', 'Hall', 'Extra corner']);
@@ -154,15 +154,16 @@ test('an after photo with the same caption as a before photo gets its name, so t
   const { projects } = await websiteProjects(files);
   const chapter = projects[0].chapters.find((c) => c.key === 'before-after');
   assert.equal(chapter.pairs.length, 3);
-  assert.deepEqual(chapter.photos.map((p) => p.name), ['3-New angle.jpg']);
+  // The photo without a partner shows in the After chapter.
+  assert.deepEqual(projects[0].chapters.find((c) => c.key === 'after').photos.map((p) => p.name), ['3-New angle.jpg']);
 
   // A name that is already used, whatever its capitals, is never reused.
-  const taken = core.listProjects(entries(['projects/project-5/before/Kitchen.jpg', 'projects/project-5/after/kitchen.JPG']), config);
+  const taken = core.listProjects(entries(['images/project-5/before/Kitchen.jpg', 'images/project-5/after/kitchen.JPG']), config);
   assert.deepEqual(core.planUpload({ state: taken, request: { project: 'project-5', chapter: { key: 'after' }, photos: [{ caption: 'Kitchen' }], changes: {} }, config }).names, ['1-Kitchen.jpg']);
 });
 
 test('a new project gets the next number, its photos, an info.txt and a cover the website finds', async () => {
-  const existing = { 'projects/project-1/woodwork/01-a.jpg': 'x', 'projects/Project 10/info.txt': 'Title: Ten\n', 'projects/Project 10/woodwork/1.jpg': 'x', 'projects/new villa/woodwork/01.jpg': 'x', 'projects/_template/info.txt': 'Title:\n', 'projects/README.txt': 'x' };
+  const existing = { 'images/project-1/woodwork/01-a.jpg': 'x', 'images/Project 10/info.txt': 'Title: Ten\n', 'images/Project 10/woodwork/1.jpg': 'x', 'images/new villa/woodwork/01.jpg': 'x', 'images/_template/info.txt': 'Title:\n', 'images/README.txt': 'x' };
   const state = core.listProjects(entries(Object.keys(existing)), config);
   assert.equal(state.next, 11);
   const request = {
@@ -173,8 +174,8 @@ test('a new project gets the next number, its photos, an info.txt and a cover th
   };
   const plan = core.planUpload({ state, request, config });
   assert.equal(plan.folder, 'project-11');
-  assert.deepEqual(plan.paths, ['projects/project-11/woodwork/1-Tall unit.jpg', 'projects/project-11/woodwork/2.jpg']);
-  assert.equal(plan.info.path, 'projects/project-11/info.txt');
+  assert.deepEqual(plan.paths, ['images/project-11/woodwork/1-Tall unit.jpg', 'images/project-11/woodwork/2.jpg']);
+  assert.equal(plan.info.path, 'images/project-11/info.txt');
   assert.equal(plan.message, 'Add photos from phone: project-11 (new project, 2 photos in woodwork)');
   assert.equal(plan.info.text, 'Title: Kitchen & <dining>\nArea: North\nSize:\nDays: 12\nFinished:\nType: Kitchens, Wardrobes\nAbout:\n\nReview:\nReview by:\nVideo:\nCover: woodwork/2.jpg\n\nPrice:\nCabinets = 1,20,000\nPaint = 30k\nNote: GST extra\n');
 
@@ -193,34 +194,34 @@ test('a new project gets the next number, its photos, an info.txt and a cover th
 });
 
 test('the cover is written with its folder, so a photo of the same name elsewhere never takes its place', async () => {
-  const existing = { 'projects/project-3/woodwork/1.jpg': 'x', 'projects/project-3/woodwork/2.jpg': 'x' };
+  const existing = { 'images/project-3/woodwork/1.jpg': 'x', 'images/project-3/woodwork/2.jpg': 'x' };
   const state = core.listProjects(entries(Object.keys(existing)), config);
   const plan = core.planUpload({ state, request: { project: 'project-3', chapter: { key: 'painting' }, photos: [{ caption: '' }, { caption: '', cover: true }], changes: {} }, infoText: '', config });
   assert.deepEqual(plan.names, ['1.jpg', '2.jpg'], 'a cover keeps its normal name');
   assert.match(plan.info.text, /\nCover: painting\/2\.jpg\n/);
   // Later the computer adds before/2.jpg: the website still shows painting/2.jpg as the cover.
-  const files = { ...existing, [plan.info.path]: plan.info.text, 'projects/project-3/before/2.jpg': 'x' };
+  const files = { ...existing, [plan.info.path]: plan.info.text, 'images/project-3/before/2.jpg': 'x' };
   for (const p of plan.paths) files[p] = 'x';
   const { projects } = await websiteProjects(files);
   assert.equal(path.basename(path.dirname(projects[0].cover.file)), 'painting');
 
   // An after photo marked as the cover still gets its before photo's name, so the two stay a slider.
-  const pairs = core.listProjects(entries(['projects/project-4/before/01-Kitchen wall.jpg']), config);
+  const pairs = core.listProjects(entries(['images/project-4/before/01-Kitchen wall.jpg']), config);
   const after = core.planUpload({ state: pairs, request: { project: 'project-4', chapter: { key: 'after' }, photos: [{ caption: 'Kitchen wall', cover: true }], changes: {} }, infoText: '', config });
   assert.deepEqual(after.names, ['01-Kitchen wall.jpg']);
   assert.match(after.info.text, /\nCover: after\/01-Kitchen wall\.jpg\n/);
-  const site = await websiteProjects({ 'projects/project-4/before/01-Kitchen wall.jpg': 'x', [after.paths[0]]: 'x', [after.info.path]: after.info.text });
+  const site = await websiteProjects({ 'images/project-4/before/01-Kitchen wall.jpg': 'x', [after.paths[0]]: 'x', [after.info.path]: after.info.text });
   const p4 = site.projects[0];
   assert.equal(p4.chapters[0].pairs.length, 1);
   assert.equal(p4.cover, p4.chapters[0].pairs[0].after);
   // A project with a cover.jpg already keeps it.
-  const withCover = core.listProjects(entries(['projects/project-3/cover.jpg', 'projects/project-3/woodwork/1.jpg']), config);
+  const withCover = core.listProjects(entries(['images/project-3/cover.jpg', 'images/project-3/woodwork/1.jpg']), config);
   assert.equal(withCover.projects[0].hasCover, true);
   assert.equal(core.planUpload({ state: withCover, request: { project: 'project-3', chapter: { key: 'woodwork' }, photos: [{ caption: '', cover: true }], changes: {} }, config }).info, null);
 });
 
 test('the form shows what the website shows from info.txt, and writing it back changes nothing on the website', async () => {
-  const template = await fs.readFile(path.join(projectRoot, 'projects', '_template', 'info.txt'), 'utf8');
+  const template = await fs.readFile(path.join(projectRoot, 'images', '_template', 'info.txt'), 'utf8');
   const samples = [
     FIXTURE_INFO,
     template,
@@ -264,7 +265,7 @@ test('changing a detail edits only that line of info.txt', async () => {
   assert.equal((await shown(cleared)).title, '');
 
   // The template keeps its notes; the price list replaces the old one; price lines after a Note go too.
-  const template = await fs.readFile(path.join(projectRoot, 'projects', '_template', 'info.txt'), 'utf8');
+  const template = await fs.readFile(path.join(projectRoot, 'images', '_template', 'info.txt'), 'utf8');
   const filled = core.updateInfo(template, { title: 'Kitchen', cover: '2.jpg', priceNote: 'GST extra', price: 'Cabinets = 1,20,000\nPaint = 30k' }, config);
   const lines = filled.split(/\r?\n/);
   assert.ok(lines.includes('Title: Kitchen'));
@@ -334,13 +335,13 @@ test('text from GitHub is read in any encoding and sent back as UTF-8', () => {
 
 const REPO_FILES = {
   'README.md': '# Woodwork website\n',
-  'projects/README.txt': 'How to add a project\n',
-  'projects/_template/info.txt': 'Title:\n',
-  'projects/project-1/info.txt': 'Title: First\n',
-  'projects/project-1/woodwork/01-a.jpg': 'jpeg-a',
-  'projects/project-2/info.txt': '# notes stay\nTitle: Second\nArea: North\n\nPrice:\nKitchen = 1,00,000\n',
-  'projects/project-2/woodwork/01-unit.jpg': 'jpeg-b',
-  'projects/project-2/before/kitchen.jpg': 'jpeg-c',
+  'images/README.txt': 'How to add a project\n',
+  'images/_template/info.txt': 'Title:\n',
+  'images/project-1/info.txt': 'Title: First\n',
+  'images/project-1/woodwork/01-a.jpg': 'jpeg-a',
+  'images/project-2/info.txt': '# notes stay\nTitle: Second\nArea: North\n\nPrice:\nKitchen = 1,00,000\n',
+  'images/project-2/woodwork/01-unit.jpg': 'jpeg-b',
+  'images/project-2/before/kitchen.jpg': 'jpeg-c',
 };
 const readBase64 = async (photo) => Buffer.from(photo.bytes).toString('base64');
 const photos = (...texts) => texts.map((t) => ({ bytes: t }));
@@ -364,9 +365,9 @@ test('a new project is saved as ONE commit: photos, then tree, commit and branch
   assert.equal(history[0].message, 'Add photos from phone: project-3 (new project, 2 photos in painting)');
   assert.equal(result.commit, fake.head);
   const files = fake.files();
-  assert.equal(files['projects/project-3/painting/1-Accent wall.jpg'].toString(), 'one');
-  assert.equal(files['projects/project-3/painting/2.jpg'].toString(), 'two');
-  assert.equal(fake.text('projects/project-3/info.txt'), core.newInfo({ title: 'Fresh paint', price: 'Painting = 39000' }));
+  assert.equal(files['images/project-3/painting/1-Accent wall.jpg'].toString(), 'one');
+  assert.equal(files['images/project-3/painting/2.jpg'].toString(), 'two');
+  assert.equal(fake.text('images/project-3/info.txt'), core.newInfo({ title: 'Fresh paint', price: 'Painting = 39000' }));
   for (const [p, content] of Object.entries(REPO_FILES)) assert.equal(files[p].toString(), content, `${p} untouched`);
   assert.equal(Object.keys(files).length, Object.keys(REPO_FILES).length + 3);
   assert.deepEqual(shape(fake.log), [
@@ -420,7 +421,7 @@ test('the key goes only to api.github.com, in the Authorization header', async (
 
 test('if something else is saved at the same moment, the upload is worked out again on top of it, after a short pause', async () => {
   const fake = new FakeGitHub({ files: REPO_FILES });
-  fake.beforeMove = (gh) => gh.pushFromElsewhere({ 'projects/project-3/info.txt': 'Title: From the computer\n', 'projects/project-3/woodwork/1.jpg': 'pc' });
+  fake.beforeMove = (gh) => gh.pushFromElsewhere({ 'images/project-3/info.txt': 'Title: From the computer\n', 'images/project-3/woodwork/1.jpg': 'pc' });
   const client = core.createClient({ token: TEST_KEY, repo: TEST_REPO, fetchImpl: fake.fetch, wait: noWait });
   const sent = photos('one');
   const waits = [];
@@ -430,8 +431,8 @@ test('if something else is saved at the same moment, the upload is worked out ag
   assert.ok(waits[0] >= 1000 && waits[0] <= 2000, `paused ${waits[0]} ms`);
   const history = fake.history();
   assert.deepEqual(history.map((c) => c.message), ['Add photos from phone: project-4 (new project, 1 photo in woodwork)', 'Update projects and photos', 'First version']);
-  assert.equal(fake.text('projects/project-3/info.txt'), 'Title: From the computer\n', 'the other save is kept');
-  assert.equal(fake.files()['projects/project-4/woodwork/1.jpg'].toString(), 'one');
+  assert.equal(fake.text('images/project-3/info.txt'), 'Title: From the computer\n', 'the other save is kept');
+  assert.equal(fake.files()['images/project-4/woodwork/1.jpg'].toString(), 'one');
   assert.equal(blobPosts(fake), 3, 'the photo was sent once (plus info.txt twice)');
 });
 
@@ -440,12 +441,12 @@ test('an existing project gets its photos and only the changed details', async (
   const client = core.createClient({ token: TEST_KEY, repo: TEST_REPO, fetchImpl: fake.fetch, wait: noWait });
   const result = await core.publish({ client, config, request: { project: 'project-2', chapter: { key: 'woodwork' }, photos: [{ caption: 'Shelf', cover: true }], changes: { area: 'North East' } }, photos: photos('shelf'), readBase64, wait: noWait });
   assert.equal(result.message, 'Add photos from phone: project-2 (1 photo in woodwork, details updated)');
-  assert.equal(fake.text('projects/project-2/info.txt'), '# notes stay\nTitle: Second\nArea: North East\nCover: woodwork/2-Shelf.jpg\n\nPrice:\nKitchen = 1,00,000\n');
-  assert.equal(fake.files()['projects/project-2/woodwork/2-Shelf.jpg'].toString(), 'shelf');
+  assert.equal(fake.text('images/project-2/info.txt'), '# notes stay\nTitle: Second\nArea: North East\nCover: woodwork/2-Shelf.jpg\n\nPrice:\nKitchen = 1,00,000\n');
+  assert.equal(fake.files()['images/project-2/woodwork/2-Shelf.jpg'].toString(), 'shelf');
 
   const details = await core.publish({ client, config, request: { project: 'project-2', chapter: null, photos: [], changes: { title: 'Second, renamed' } }, photos: [], readBase64, wait: noWait });
   assert.equal(details.message, 'Update details from phone: project-2');
-  assert.match(fake.text('projects/project-2/info.txt'), /^# notes stay\nTitle: Second, renamed\n/);
+  assert.match(fake.text('images/project-2/info.txt'), /^# notes stay\nTitle: Second, renamed\n/);
 
   const before = fake.head;
   const same = await core.publish({ client, config, request: { project: 'project-2', chapter: null, photos: [], changes: { area: 'North East' } }, photos: [], readBase64, wait: noWait });
@@ -472,7 +473,7 @@ test('a lost connection keeps the photos that already arrived, and Publish again
   offline = false;
   await core.publish({ client, config, request, photos: sent, readBase64, wait: noWait });
   assert.equal(blobPosts(fake), 3, 'photo one was not sent twice (two photos and info.txt)');
-  assert.equal(fake.files()['projects/project-3/woodwork/2.jpg'].toString(), 'two');
+  assert.equal(fake.files()['images/project-3/woodwork/2.jpg'].toString(), 'two');
 });
 
 test('a save whose answer was lost is found later, even after a merge or many saves from the computer', async () => {
@@ -500,10 +501,10 @@ test('a save whose answer was lost is found later, even after a merge or many sa
     assert.equal(JSON.parse(stored.at(-1)).commit, ours, 'and kept it before the branch was moved');
     assert.ok(fake.ancestors(fake.head).has(ours), 'GitHub did save it');
     if (afterwards === 'a merge') {
-      fake.mergeFromElsewhere({ 'projects/project-1/woodwork/02-b.jpg': 'pc' });
+      fake.mergeFromElsewhere({ 'images/project-1/woodwork/02-b.jpg': 'pc' });
       assert.notEqual(fake.commits.get(fake.head).parents[0], ours, 'the save is now only a second parent');
     } else {
-      for (let i = 2; i < 8; i++) fake.pushFromElsewhere({ [`projects/project-1/woodwork/0${i}-pc.jpg`]: `pc${i}` });
+      for (let i = 2; i < 8; i++) fake.pushFromElsewhere({ [`images/project-1/woodwork/0${i}-pc.jpg`]: `pc${i}` });
     }
     // The page was closed and opened again: only what it kept is left.
     const reopened = JSON.parse(stored.at(-1));
@@ -515,7 +516,7 @@ test('a save whose answer was lost is found later, even after a merge or many sa
     assert.deepEqual(again.sent, sent.map((p) => p.sha));
     assert.equal(commitsOnBranch(fake), before, `nothing was saved twice after ${afterwards}`);
     assert.deepEqual(reopened, {});
-    assert.deepEqual(Object.keys(fake.files()).filter((p) => p.startsWith('projects/project-4/')), []);
+    assert.deepEqual(Object.keys(fake.files()).filter((p) => p.startsWith('images/project-4/')), []);
   }
 
   // The answer is lost, the repeated request is refused because the branch is already there: still one save.
@@ -534,7 +535,7 @@ test('a save whose answer was lost is found later, even after a merge or many sa
   const result = await core.publish({ client, config, request: { project: 'project-1', chapter: { key: 'woodwork' }, photos: [{ caption: '' }], changes: {} }, photos: photos('three'), readBase64, memo: {}, wait: noWait });
   assert.equal(result.commit, fake.head);
   assert.equal(fake.history().length, 2);
-  assert.deepEqual(Object.keys(fake.files()).filter((p) => p.startsWith('projects/project-1/woodwork/')).sort(), ['projects/project-1/woodwork/01-a.jpg', 'projects/project-1/woodwork/2.jpg']);
+  assert.deepEqual(Object.keys(fake.files()).filter((p) => p.startsWith('images/project-1/woodwork/')).sort(), ['images/project-1/woodwork/01-a.jpg', 'images/project-1/woodwork/2.jpg']);
 });
 
 test('photos that are on GitHub already are not saved again, even when the page forgot its last save', async () => {
@@ -553,7 +554,7 @@ test('photos that are on GitHub already are not saved again, even when the page 
   assert.equal(again.unchanged, true);
   assert.equal(again.folder, 'project-3');
   assert.equal(again.num, 3);
-  assert.deepEqual(again.alreadyPaths, ['projects/project-3/woodwork/1.jpg', 'projects/project-3/woodwork/2.jpg']);
+  assert.deepEqual(again.alreadyPaths, ['images/project-3/woodwork/1.jpg', 'images/project-3/woodwork/2.jpg']);
   assert.deepEqual(again.sent, first.map((p) => p.sha));
   assert.equal(commitsOnBranch(fake), commits, 'no second copy of the project');
   assert.equal(blobPosts(fake), 3, 'and the photos were not even sent again');
@@ -562,13 +563,13 @@ test('photos that are on GitHub already are not saved again, even when the page 
   const details = await core.publish({ client, config, request: { ...request, changes: { title: 'Saved once', area: 'North' } }, photos: await prepared('one', 'two'), readBase64, memo: {}, wait: noWait });
   assert.equal(details.already, true);
   assert.equal(details.message, 'Update details from phone: project-3');
-  assert.match(fake.text('projects/project-3/info.txt'), /^Title: Saved once\nArea: North\n/);
+  assert.match(fake.text('images/project-3/info.txt'), /^Title: Saved once\nArea: North\n/);
 
   // With one new photo among them, everything is published as usual (a photo may be used twice on purpose).
   const mixed = await core.publish({ client, config, request: { project: 'project-3', chapter: { key: 'painting' }, photos: [{}, {}], changes: {} }, photos: await prepared('one', 'new'), readBase64, memo: {}, wait: noWait });
   assert.equal(mixed.already, undefined);
-  assert.deepEqual(mixed.paths, ['projects/project-3/painting/1.jpg', 'projects/project-3/painting/2.jpg']);
-  assert.equal(fake.files()['projects/project-3/painting/1.jpg'].toString(), 'one');
+  assert.deepEqual(mixed.paths, ['images/project-3/painting/1.jpg', 'images/project-3/painting/2.jpg']);
+  assert.equal(fake.files()['images/project-3/painting/1.jpg'].toString(), 'one');
 });
 
 test('the last save is forgotten only when GitHub definitely does not have it', async () => {
@@ -596,7 +597,7 @@ test('the last save is forgotten only when GitHub definitely does not have it', 
   const result = await core.publish({ client, config, request, photos: photos('a'), readBase64, memo, onMemo: (m) => changes.push({ ...m }), wait: noWait });
   assert.equal(result.earlier, undefined);
   assert.deepEqual(changes[0], {});
-  assert.deepEqual(result.paths, ['projects/project-1/woodwork/2.jpg']);
+  assert.deepEqual(result.paths, ['images/project-1/woodwork/2.jpg']);
 
   // A commit GitHub has never heard of (or has tidied away) was never saved either.
   const unknown = { commit: 'f'.repeat(40), plan: {}, sent: [] };
@@ -688,9 +689,9 @@ test('the upload page is built at admin/, never linked, not indexed, and only ta
   try {
     await writeText(dir, 'site/business.txt', 'Business name: Test & Sons\nPhone: 90000 00001\n');
     await writeText(dir, 'site/rates.txt', 'Wardrobes = 1200 per sq ft\n');
-    await writeText(dir, 'projects/project-1/info.txt', 'Title: First </script><b>\n');
-    await writePhoto(dir, 'projects/project-1/woodwork/01-a.jpg', 'wardrobe');
-    await writePhoto(dir, 'projects/new villa/woodwork/01.jpg', 'kitchen');
+    await writeText(dir, 'images/project-1/info.txt', 'Title: First </script><b>\n');
+    await writePhoto(dir, 'images/project-1/woodwork/01-a.jpg', 'wardrobe');
+    await writePhoto(dir, 'images/new villa/woodwork/01.jpg', 'kitchen');
     const out = path.join(dir, 'dist');
     await build({ root: dir, out, base: '/website/', siteUrl: 'https://me.github.io/website', repo: 'me/website' });
     const html = await fs.readFile(path.join(out, 'admin', 'index.html'), 'utf8');

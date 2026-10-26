@@ -10,21 +10,21 @@ tests/.rehearsal-run.txt
 
 # Files the website can't use are never uploaded: videos go on YouTube, and iPhone HEIC photos
 # must be saved as JPG first. The preview window tells you about any it finds.
-projects/**/*.mp4
-projects/**/*.MP4
-projects/**/*.mov
-projects/**/*.MOV
-projects/**/*.avi
-projects/**/*.AVI
-projects/**/*.mkv
-projects/**/*.3gp
-projects/**/*.webm
-projects/**/*.m4v
-projects/**/*.wmv
-projects/**/*.heic
-projects/**/*.HEIC
-projects/**/*.heif
-projects/**/*.HEIF
+images/**/*.mp4
+images/**/*.MP4
+images/**/*.mov
+images/**/*.MOV
+images/**/*.avi
+images/**/*.AVI
+images/**/*.mkv
+images/**/*.3gp
+images/**/*.webm
+images/**/*.m4v
+images/**/*.wmv
+images/**/*.heic
+images/**/*.HEIC
+images/**/*.heif
+images/**/*.HEIF
 site/**/*.mp4
 site/**/*.MP4
 site/**/*.mov

@@ -1,9 +1,11 @@
-// `npm run samples` — creates the sample projects, business details and the _template folder.
+// `npm run samples` — creates the sample projects (images/project-1 to 4, each with before and after
+// photos), business details and the images/_template folder.
 // Existing files are never overwritten unless you add --force.
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { writeSamplePhoto } from './sample-art.mjs';
+import { PROJECTS_DIR } from '../src/util.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const force = process.argv.includes('--force');
@@ -72,15 +74,11 @@ Repairs = Visit ₹500, then quoted
 `;
 
 const TEMPLATE_INFO = `
-# HOW TO USE THIS TEMPLATE
-# 1. Copy this whole "_template" folder and rename the copy with the next number, like "project-5".
-# 2. Put photos in the folders below. Leave any folder empty and that part is simply not shown.
-#      before / after   photos with the same name in both folders become a before/after slider
-#      woodwork, painting, repairs, team, quality, materials
-#      You can also make your own folder, like "kitchen" or "pooja room". It becomes its own chapter.
-# 3. Photo names become captions: "01-master-wardrobe.jpg" shows as "Master wardrobe".
-#    Phone names like IMG_2041.jpg are fine too; they just show no caption.
-# 4. Fill in the details below (everything is optional). Lines starting with # are notes.
+# This file is OPTIONAL. Without it the project still shows, as "Project 5".
+# Fill in what you like; leave the rest empty. Lines starting with # are notes for you.
+# Photos go in the two folders next to this file:
+#   before   the home before you started (empty rooms, old walls)
+#   after    the finished work
 
 Title:
 Area:
@@ -100,17 +98,36 @@ Video:
 Price:
 `;
 
-const README = `
-HOW TO ADD A NEW PROJECT
-========================
-1. Copy the folder "_template" and rename the copy to the next number, for example "project-5".
-2. Put photos into its folders: woodwork, painting, repairs, team, quality, materials, before, after.
-3. Open info.txt in the folder and fill in the title, area, days and price (all optional).
-4. See it: double-click PREVIEW.cmd. Put it online: commit and push in GitHub Desktop.
+const HOW_TO = `
+HOW TO ADD YOUR PHOTOS
+======================
 
-- The highest number shows first on the website, as "Project 5".
-- Folders whose names start with _ are ignored.
-- project-1 to project-4 are SAMPLES with drawn pictures. Delete them once your real projects are in.
+Every project is one folder in here, with two folders inside:
+
+  images
+    project-1
+      before     <- photos of the home BEFORE the work (empty rooms, old walls)
+      after      <- photos of the FINISHED work
+    project-2
+      before
+      after
+
+To add a new project:
+  1. Copy the folder "_template" and rename the copy to the next number, like "project-5".
+  2. Put photos in its "before" folder and its "after" folder.
+  3. That's all. To see it, double-click PREVIEW.cmd. To put it online, double-click PUBLISH.cmd.
+
+Good to know:
+  - Photos show on the website in the same order as in the folder (sorted by name). Phone photos
+    (IMG_2026...) are already in the order you took them. To choose the order yourself, start the
+    names with 1, 2, 3, like "1 kitchen.jpg", "2 hall.jpg".
+  - A name like "master-wardrobe.jpg" is shown under the photo as "Master wardrobe".
+  - The highest number shows first on the website: project-5 comes before project-1.
+  - info.txt (optional) is for the title, area and price of the project.
+  - Optional: give a before photo and an after photo the same name (kitchen.jpg in both folders) and
+    the website shows them as a slider you can drag to compare.
+  - Folders whose names start with _ are ignored.
+  - project-1 to project-4 are SAMPLES with drawn pictures. Delete them once your real projects are in.
 `;
 
 const PROJECTS = [
@@ -132,11 +149,8 @@ Painting, 2 coats = 39000
 Door polish = 8000
 `,
     photos: {
-      before: [['01-living-room-wall', 'damaged'], ['02-bedroom-corner', 'damaged']],
-      after: [['01-living-room-wall', 'paint'], ['02-bedroom-corner', 'fixed']],
-      painting: [['01-living-room-accent-wall', 'paint'], ['02-texture-wall', 'texture'], ['03-bedroom-colours', 'paint'], ['04-main-door-polish', 'door']],
-      repairs: [['01-damp-wall-treated', 'fixed'], ['02-cracks-filled', 'fixed'], ['03-skirting-replaced', 'fixed']],
-      team: [['01-painter-on-second-coat', 'team'], ['02-cleanup-before-handover', 'team']],
+      before: [['01-living-room-wall', 'damaged'], ['02-bedroom-corner', 'damaged'], ['03-old-main-door', 'damaged']],
+      after: [['01-living-room-wall', 'paint'], ['02-texture-wall', 'texture'], ['03-bedroom-colours', 'paint'], ['04-main-door-polish', 'door'], ['05-damp-wall-treated', 'fixed']],
     },
   },
   {
@@ -157,10 +171,8 @@ Soft-close hardware = 38000
 Counter and backsplash = 30000
 `,
     photos: {
-      woodwork: [['01-l-shaped-kitchen', 'kitchen'], ['02-tall-storage-unit', 'wardrobe'], ['03-wall-cabinets', 'kitchen'], ['04-drawer-stack', 'kitchen'], ['05-breakfast-counter', 'tvunit']],
-      quality: [['01-soft-close-hinge', 'hinge'], ['02-2-mm-edge-banding', 'edge'], ['03-drawer-handles', 'hardware']],
-      materials: [['01 BWP plywood', 'plywood'], ['02 Acrylic laminate', 'laminate'], ['03 Handles and channels', 'hardware']],
-      team: [['01-carpenter-fitting-shutters', 'team']],
+      before: [['01-empty-kitchen', 'empty'], ['02-kitchen-wall', 'empty']],
+      after: [['01-l-shaped-kitchen', 'kitchen'], ['02-tall-storage-unit', 'wardrobe'], ['03-wall-cabinets', 'kitchen'], ['04-drawer-stack', 'kitchen'], ['05-soft-close-hinge', 'hinge']],
     },
   },
   {
@@ -181,9 +193,8 @@ Kids room wardrobe = 64000
 Lofts above both = 22000
 `,
     photos: {
-      woodwork: [['01-master-wardrobe-sliding-doors', 'wardrobe'], ['02-kids-room-wardrobe', 'wardrobe'], ['03-loft-storage', 'wardrobe'], ['04-dressing-unit', 'tvunit'], ['05-study-shelf', 'tvunit']],
-      quality: [['01-even-shutter-gaps', 'edge'], ['02-handles-aligned', 'hardware']],
-      materials: [['01-laminate-shades', 'laminate'], ['02-hinges-and-channels', 'hinge']],
+      before: [['01-empty-master-bedroom', 'empty'], ['02-empty-kids-room', 'empty']],
+      after: [['01-master-wardrobe-sliding-doors', 'wardrobe'], ['02-kids-room-wardrobe', 'wardrobe'], ['03-loft-storage', 'wardrobe'], ['04-dressing-unit', 'tvunit'], ['05-even-shutter-gaps', 'edge']],
     },
   },
   {
@@ -207,14 +218,8 @@ TV unit and doors = 78,000
 Painting, full home = 65,000
 `,
     photos: {
-      before: [['01-kitchen', 'damaged']],
-      after: [['01-kitchen', 'kitchen']],
-      woodwork: [['01-master-wardrobe-sliding-doors', 'wardrobe'], ['02-kitchen-tall-unit', 'kitchen'], ['03-tv-unit-with-back-panel', 'tvunit'], ['04-main-door', 'door'], ['05-kids-room-wardrobe', 'wardrobe'], ['06-pooja-unit', 'door']],
-      painting: [['01-living-room-texture-wall', 'texture'], ['02-bedroom-accent-wall', 'paint'], ['03-kids-room-colours', 'paint']],
-      repairs: [['01-damp-wall-treated', 'fixed'], ['02-loose-shutter-rehung', 'wardrobe']],
-      team: [['01-carpenter-fitting-shutters', 'team'], ['02-painter-on-second-coat', 'team']],
-      quality: [['01-2-mm-machine-edge-banding', 'edge'], ['02-soft-close-hinge', 'hinge'], ['03-flush-joints', 'edge']],
-      materials: [['01 BWP ply 18 mm', 'plywood'], ['02 Acrylic laminate', 'laminate'], ['03 Premium emulsion paint', 'cans']],
+      before: [['01-empty-living-room', 'empty'], ['02-empty-kitchen', 'empty'], ['03-empty-bedroom', 'empty']],
+      after: [['01-living-room-tv-unit', 'tvunit'], ['02-modular-kitchen', 'kitchen'], ['03-master-wardrobe', 'wardrobe'], ['04-main-door', 'door'], ['05-living-room-texture-wall', 'texture'], ['06-kids-room-wardrobe', 'wardrobe']],
     },
   },
 ];
@@ -236,15 +241,15 @@ const TEAM = [
 
 await writeIfMissing(path.join(root, 'site', 'business.txt'), text(BUSINESS));
 await writeIfMissing(path.join(root, 'site', 'rates.txt'), text(RATES));
-await writeIfMissing(path.join(root, 'projects', 'README.txt'), text(README));
-await writeIfMissing(path.join(root, 'projects', '_template', 'info.txt'), text(TEMPLATE_INFO));
-for (const folder of ['before', 'after', 'woodwork', 'painting', 'repairs', 'team', 'quality', 'materials']) {
-  await writeIfMissing(path.join(root, 'projects', '_template', folder, '.gitkeep'), text(''));
+await writeIfMissing(path.join(root, PROJECTS_DIR, 'HOW TO ADD PHOTOS.txt'), text(HOW_TO));
+await writeIfMissing(path.join(root, PROJECTS_DIR, '_template', 'info.txt'), text(TEMPLATE_INFO));
+for (const folder of ['before', 'after']) {
+  await writeIfMissing(path.join(root, PROJECTS_DIR, '_template', folder, '.gitkeep'), text(''));
 }
 
 let seed = 1;
 for (const project of PROJECTS) {
-  const dir = path.join(root, 'projects', project.folder);
+  const dir = path.join(root, PROJECTS_DIR, project.folder);
   await writeIfMissing(path.join(dir, 'info.txt'), text(project.info));
   for (const [chapter, photos] of Object.entries(project.photos)) {
     for (const [name, kind] of photos) {

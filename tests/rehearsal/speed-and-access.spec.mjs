@@ -65,9 +65,13 @@ test('screenshots of every kind of page for review', async ({ page }, testInfo) 
   await page.goto('project/1/');
   await loadAll();
   await snap('3-project-top');
+  await page.locator('#ch-before').scrollIntoViewIfNeeded();
+  await snap('4a-project-before');
+  await page.locator('#ch-after').scrollIntoViewIfNeeded();
+  await snap('4b-project-after');
   await page.locator('#ch-before-after').scrollIntoViewIfNeeded();
-  await snap('4-project-before-after');
-  await page.locator('#ch-woodwork a[data-lb]').first().click();
+  await snap('4c-project-compare');
+  await page.locator('#ch-after a[data-lb]').first().click();
   await page.getByRole('dialog', { name: 'Photo viewer' }).locator('.v-img').evaluate((img) => img.complete || new Promise((r) => { img.onload = r; }));
   await snap('5-photo-viewer');
   await page.keyboard.press('Escape');

@@ -6,6 +6,7 @@ import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { build, sizeReport } from './build.mjs';
 import { createStaticServer, listen } from './serve.mjs';
+import { PROJECTS_DIR } from './util.mjs';
 
 const args = process.argv.slice(2);
 const arg = (name, fallback) => {
@@ -156,7 +157,7 @@ function watchFolder(dir) {
 
 port = await listen(server, wantedPort);
 await rebuild();
-watchFolder(path.join(root, 'projects'));
+watchFolder(path.join(root, PROJECTS_DIR));
 watchFolder(path.join(root, 'site'));
 if (root === projectRoot) {
   fs.watch(path.join(projectRoot, 'src'), { recursive: true }, scheduleRebuild);
@@ -165,7 +166,7 @@ if (root === projectRoot) {
 const url = `http://localhost:${port}/`;
 log('');
 log(`  Your website preview is running at  ${url}`);
-log('  Add or change photos in the "projects" folder and the page refreshes by itself.');
+log(`  Add or change photos in the "${PROJECTS_DIR}" folder (before and after) and the page refreshes by itself.`);
 log('  Keep this window open. Close it (or press Ctrl+C) to stop the preview.');
 log('');
 if (openBrowser) {

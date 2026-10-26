@@ -93,21 +93,29 @@ const TITLES = [
   ['Exterior repaint', 'Painting'],
   ['Damp wall treatment', 'Repairs'],
 ];
-const CHAPTER_SETS = [
-  ['before', 'after', 'woodwork', 'painting', 'repairs', 'team', 'quality', 'materials'],
-  ['woodwork', 'quality', 'materials', 'team'],
-  ['woodwork', 'painting'],
-  ['before', 'after', 'painting', 'repairs'],
-  ['woodwork', 'pooja room', 'quality'],
-  ['photos'],
-  ['woodwork', '3D wall panels', 'team', 'materials'],
-];
-const KINDS = { woodwork: ['wardrobe', 'kitchen', 'tvunit', 'door'], painting: ['paint', 'texture'], repairs: ['fixed', 'damaged'], team: ['team'], quality: ['edge', 'hinge'], materials: ['plywood', 'laminate', 'hardware', 'cans'], 'pooja room': ['door'], '3D wall panels': ['texture'], photos: ['wardrobe', 'paint', 'kitchen'], before: ['damaged'], after: ['paint', 'kitchen'] };
-const CAPTIONS = ['master-wardrobe-sliding-doors', 'kitchen-tall-unit', 'tv-unit-with-back-panel', 'main-door-polish', 'loft-storage', 'study-shelf', 'texture-wall', 'accent-wall', 'edge-banding-close-up', 'soft-close-hinge', 'crack-repair', 'damp-wall-fixed', 'carpenter-at-work', 'painter-second-coat', 'bwp-plywood', 'acrylic-laminate'];
+// Every project is images/<folder>/before + after, like the owner's own. A few also have an extra folder,
+// loose photos, or only after photos, and every kind of file name a phone or the owner gives a photo.
+const EXTRAS = ['', '', '', 'woodwork', 'only-after', 'pooja room', 'loose'];
+const NAME_STYLES = ['camera', 'whatsapp', 'caption', 'number', 'upper'];
+const KINDS = { before: ['empty', 'damaged'], after: ['kitchen', 'wardrobe', 'tvunit', 'door', 'paint', 'texture'], woodwork: ['wardrobe', 'door'], 'pooja room': ['door'], loose: ['wardrobe', 'paint'] };
+const CAPTIONS = ['master-wardrobe-sliding-doors', 'kitchen-tall-unit', 'tv-unit-with-back-panel', 'main-door-polish', 'loft-storage', 'study-shelf', 'texture-wall', 'accent-wall', 'edge-banding-close-up', 'soft-close-hinge', 'crack-repair', 'damp-wall-fixed', 'empty-hall', 'old-kitchen', 'bwp-plywood', 'acrylic-laminate'];
 
-/** Builds the whole content folder (projects/ and site/) inside `root`. Returns counts for the report. */
+/** The name a phone, WhatsApp, a camera or the owner gives the k-th photo of a folder. */
+function photoName(style, index, k, side) {
+  const caption = CAPTIONS[(index * 3 + k + (side === 'after' ? 7 : 0)) % CAPTIONS.length];
+  const day = side === 'before' ? 10 : 20;
+  return {
+    caption: `${String(k + 1).padStart(2, '0')}-${caption}.jpg`,
+    camera: `IMG_202610${day}_${String(9 + k).padStart(2, '0')}${String(10 + index).slice(-2)}${String(10 + k)}.jpg`,
+    whatsapp: `WhatsApp Image 2026-10-${day + (k % 8)} at 1${k % 10}.${String(10 + index).slice(-2)}.${20 + k}.jpeg`,
+    number: `${k + 1}.jpg`,
+    upper: `DSC_${String(4000 + index * 20 + k + (side === 'after' ? 10 : 0))}.JPG`,
+  }[style];
+}
+
+/** Builds the whole content folder (images/ and site/) inside `root`. Returns counts for the report. */
 export async function makeRealisticContent(root, { projects = 34, bigPhotos = 12 } = {}) {
-  await fs.rm(path.join(root, 'projects'), { recursive: true, force: true });
+  await fs.rm(path.join(root, 'images'), { recursive: true, force: true });
   await fs.rm(path.join(root, 'site'), { recursive: true, force: true });
   const rnd = random(20261020);
   let photos = 0;
@@ -161,7 +169,6 @@ Damp treatment = Quoted after inspection
   folders.push({ folder: 'Kondapur villa', n: 0 }, { folder: 'పూజ గది', n: 0 });
   for (const [index, { folder, n }] of folders.entries()) {
     const [title, types] = TITLES[index % TITLES.length];
-    const chapters = CHAPTER_SETS[index % CHAPTER_SETS.length];
     const area = AREAS[index % AREAS.length];
     const priced = index % 5 !== 3;
     const lines = [
@@ -182,51 +189,60 @@ Damp treatment = Quoted after inspection
       priced && index % 3 === 0 ? 'Note: GST extra' : '',
       priced && index % 3 === 0 ? 'Repairs = Rs. 18,000/-' : '',
     ].filter((l) => l !== '');
-    await write(root, `projects/${folder}/info.txt`, `${lines.join('\n')}\n`);
+    await write(root, `images/${folder}/info.txt`, `${lines.join('\n')}\n`);
 
-    for (const chapter of chapters) {
-      if (chapter === 'after') continue;
-      const count = chapter === 'before' ? 2 : 2 + Math.floor(rnd() * 4);
+    const extra = EXTRAS[index % EXTRAS.length];
+    const style = NAME_STYLES[index % NAME_STYLES.length];
+    const sides = extra === 'only-after' ? ['after'] : ['before', 'after'];
+    for (const side of sides) {
+      const count = side === 'before' ? 2 + (index % 3) : 4 + Math.floor(rnd() * 4);
       for (let k = 0; k < count; k++) {
-        const kindList = KINDS[chapter] || ['wardrobe'];
-        const kind = kindList[k % kindList.length];
-        const styles = ['caption', 'camera', 'whatsapp', 'caption', 'upper'];
-        const style = chapter === 'before' ? 'caption' : styles[(index + k) % styles.length];
-        const caption = CAPTIONS[(index * 3 + k) % CAPTIONS.length];
-        const name = {
-          caption: `${String(k + 1).padStart(2, '0')}-${caption}.jpg`,
-          camera: `IMG_2026${String(1000 + index).slice(-2)}${String(10 + k)}_1432${10 + k}.jpg`,
-          whatsapp: `WhatsApp Image 2026-10-${String(10 + (k % 18)).padStart(2, '0')} at 14.${10 + k}.${20 + k}.jpeg`,
-          upper: `DSC_${String(4000 + index * 10 + k)}.JPG`,
-        }[style];
-        const makeBig = big < bigPhotos && k === 0 && chapter !== 'before';
+        const kind = KINDS[side][(index + k) % KINDS[side].length];
+        // The first after photo of a dozen projects is a full-size phone photo stored sideways, with GPS.
+        const makeBig = big < bigPhotos && k === 0 && side === 'after';
         const portrait = makeBig ? big % 2 === 1 : rnd() < 0.3;
         // Upright phone photos are usually stored sideways with flag 6 (or 8); include upside-down (3) and plain (1) too.
         const orientation = makeBig ? (portrait ? (big % 4 === 1 ? 6 : 8) : (big % 4 === 0 ? 1 : 3)) : 1;
         const [w, h] = makeBig ? (portrait ? [3024, 4032] : [4032, 3024]) : portrait ? [1050, 1400] : [1400, 1050];
         // Full-size photos get names the browser tests look for, to check they show the right way up.
-        const fileName = makeBig ? `00-upright-${portrait ? 'portrait' : 'landscape'}-check-${big + 1}.jpg` : name;
-        await realisticPhoto(path.join(root, 'projects', folder, chapter, fileName), { width: w, height: h, kind, seed: seed++, orientation, gps: makeBig || k === 1, grain: makeBig ? 26 : 18, quality: makeBig ? 92 : 86 });
+        const fileName = makeBig ? `00-upright-${portrait ? 'portrait' : 'landscape'}-check-${big + 1}.jpg` : photoName(style, index, k, side);
+        await realisticPhoto(path.join(root, 'images', folder, side, fileName), { width: w, height: h, kind, seed: seed++, orientation, gps: makeBig || k === 1, grain: makeBig ? 26 : 18, quality: makeBig ? 92 : 86 });
         if (makeBig) big++;
         photos++;
-        if (chapter === 'before') {
-          await realisticPhoto(path.join(root, 'projects', folder, 'after', name), { width: 1400, height: 1050, kind: (KINDS.after)[k % 2], seed: seed++, grain: 18, quality: 86 });
-          photos++;
-        }
+      }
+    }
+    // Every seventh project has before and after photos of the same spot, named alike: they become sliders.
+    if (index % 7 === 0) {
+      for (const [k, name] of ['kitchen-wall.jpg', 'master-bedroom.jpg'].entries()) {
+        await realisticPhoto(path.join(root, 'images', folder, 'before', name), { width: 1400, height: 1050, kind: 'empty', seed: seed++, grain: 18, quality: 86 });
+        await realisticPhoto(path.join(root, 'images', folder, 'after', name), { width: 1400, height: 1050, kind: ['kitchen', 'wardrobe'][k], seed: seed++, grain: 18, quality: 86 });
+        photos += 2;
+      }
+    }
+    if (extra === 'woodwork' || extra === 'pooja room') {
+      for (let k = 0; k < 3; k++) {
+        await realisticPhoto(path.join(root, 'images', folder, extra, photoName('caption', index, k, 'after')), { width: 1400, height: 1050, kind: KINDS[extra][k % KINDS[extra].length], seed: seed++, grain: 18, quality: 86 });
+        photos++;
+      }
+    }
+    if (extra === 'loose') {
+      for (let k = 0; k < 2; k++) {
+        await realisticPhoto(path.join(root, 'images', folder, photoName('camera', index, k, 'after')), { width: 1400, height: 1050, kind: KINDS.loose[k], seed: seed++, grain: 18, quality: 86 });
+        photos++;
       }
     }
     if (index === 1) {
-      await realisticPhoto(path.join(root, 'projects', folder, 'woodwork', 'Screenshot_20261012-101010.png'), { width: 1080, height: 2340, kind: 'kitchen', seed: seed++, grain: 6 });
-      await realisticPhoto(path.join(root, 'projects', folder, 'woodwork', 'kitchen-handles.webp'), { width: 1600, height: 1200, kind: 'hardware', seed: seed++ });
-      await realisticPhoto(path.join(root, 'projects', folder, 'woodwork', 'pantry.jfif'), { width: 1600, height: 1200, kind: 'kitchen', seed: seed++, format: 'jpeg' });
-      await realisticPhoto(path.join(root, 'projects', folder, 'woodwork', 'పూజ మందిరం.jpg'), { width: 1400, height: 1050, kind: 'door', seed: seed++ });
-      await write(root, `projects/${folder}/woodwork/IMG_4567.HEIC`, 'not a real heic file');
-      await write(root, `projects/${folder}/team/VID_20261012.mp4`, 'not a real video');
+      await realisticPhoto(path.join(root, 'images', folder, 'after', 'Screenshot_20261012-101010.png'), { width: 1080, height: 2340, kind: 'kitchen', seed: seed++, grain: 6 });
+      await realisticPhoto(path.join(root, 'images', folder, 'after', 'kitchen-handles.webp'), { width: 1600, height: 1200, kind: 'hardware', seed: seed++ });
+      await realisticPhoto(path.join(root, 'images', folder, 'after', 'pantry.jfif'), { width: 1600, height: 1200, kind: 'kitchen', seed: seed++, format: 'jpeg' });
+      await realisticPhoto(path.join(root, 'images', folder, 'after', 'పూజ మందిరం.jpg'), { width: 1400, height: 1050, kind: 'door', seed: seed++ });
+      await write(root, `images/${folder}/after/IMG_4567.HEIC`, 'not a real heic file');
+      await write(root, `images/${folder}/before/VID_20261012.mp4`, 'not a real video');
       photos += 4;
     }
     if (index === 3) {
-      await realisticPhoto(path.join(root, 'projects', folder, 'painting', 'panorama-living-room.jpg'), { width: 8000, height: 1800, kind: 'paint', seed: seed++, gps: true });
-      await realisticPhoto(path.join(root, 'projects', folder, 'painting', 'tiny.jpg'), { width: 320, height: 240, kind: 'paint', seed: seed++ });
+      await realisticPhoto(path.join(root, 'images', folder, 'after', 'panorama-living-room.jpg'), { width: 8000, height: 1800, kind: 'paint', seed: seed++, gps: true });
+      await realisticPhoto(path.join(root, 'images', folder, 'after', 'tiny.jpg'), { width: 320, height: 240, kind: 'paint', seed: seed++ });
       photos += 2;
     }
   }

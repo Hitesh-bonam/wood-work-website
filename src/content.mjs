@@ -1,10 +1,10 @@
-// Reads the folders the owner edits (projects/ and site/) and turns them into plain data.
+// Reads the folders the owner edits (images/ and site/) and turns them into plain data.
 // Nothing here touches the photos themselves; see photos.mjs for that.
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { createHash } from 'node:crypto';
 import {
-  PHOTO_EXTS, UNSUPPORTED_EXTS, SILENT_EXTS, isHiddenName, isHiddenFile, findFile, naturalCompare, readTextIfExists,
+  PROJECTS_DIR, PHOTO_EXTS, UNSUPPORTED_EXTS, SILENT_EXTS, isHiddenName, isHiddenFile, isCameraName, findFile, naturalCompare, readTextIfExists,
   parseKeyValueText, parsePriceLine, parseAmount, captionFromFilename, splitTitle, youtubeId, walk, plural, normKey,
 } from './util.mjs';
 
@@ -112,18 +112,26 @@ function collectPhotos(files, root, warn) {
 
 /**
  * The part of a photo's name that its before and after photos share. The number in front only sets the
- * order, so "01-kitchen.jpg" in before/ pairs with "1-kitchen.jpg" or "kitchen.jpg" in after/; photos
- * named only by a number pair by that number ("01.jpg" ↔ "1.jpg").
+ * order, so "01-kitchen.jpg" in before/ pairs with "1-kitchen.jpg" or "kitchen.jpg" in after/, and
+ * "1-before.jpg" pairs with "1-after.jpg". Phone names (IMG_2041.jpg) and plain numbers ("1.jpg" in both
+ * folders, there only to set the order) never pair: they are different photos.
  */
 function pairKey(photo) {
-  const base = path.parse(photo.name).name.toLowerCase();
+  const raw = path.parse(photo.name).name;
+  if (isCameraName(raw)) return '';
+  const base = raw.toLowerCase();
   const order = base.match(/^\s*(\d+)(?:\s*[-_.)]\s*|\s+|$)/);
-  const words = (order ? base.slice(order[0].length) : base).replace(/\b(before|after)\b/g, '').replace(/[^\p{L}\p{N}]+/gu, '');
-  if (words) return words;
-  return order ? String(Number(order[1])) : '';
+  const rest = order ? base.slice(order[0].length) : base;
+  const named = /\b(before|after)\b/.test(rest);
+  const words = rest.replace(/\b(before|after)\b/g, '').replace(/[^\p{L}\p{N}]+/gu, '');
+  if (words) return /\p{L}/u.test(words) || named ? words : '';
+  return order && named ? String(Number(order[1])) : '';
 }
 
-/** Matches before/after photos by name (kitchen.jpg ↔ kitchen.jpg), otherwise by order. */
+/**
+ * A before photo and the after photo with the same name (kitchen.jpg in both folders) become a slider.
+ * Nothing is paired by guessing: every other photo stays in its own folder, in that folder's order.
+ */
 function pairBeforeAfter(before, after) {
   const pairs = [];
   const byKey = new Map();
@@ -134,7 +142,8 @@ function pairBeforeAfter(before, after) {
   const used = new Set();
   const restBefore = [];
   for (const photo of before) {
-    const match = byKey.get(pairKey(photo));
+    const key = pairKey(photo);
+    const match = key ? byKey.get(key) : null;
     if (match && !used.has(match)) {
       used.add(match);
       pairs.push({ before: photo, after: match });
@@ -142,12 +151,7 @@ function pairBeforeAfter(before, after) {
       restBefore.push(photo);
     }
   }
-  const restAfter = after.filter((photo) => !used.has(photo));
-  if (restBefore.length && restBefore.length === restAfter.length) {
-    restBefore.forEach((photo, i) => pairs.push({ before: photo, after: restAfter[i] }));
-    return { pairs, singles: [] };
-  }
-  return { pairs, singles: [...restBefore.map((p) => ({ ...p, label: 'Before' })), ...restAfter.map((p) => ({ ...p, label: 'After' }))] };
+  return { pairs, before: restBefore, after: after.filter((photo) => !used.has(photo)) };
 }
 
 /** Lines after "Price:" that read like "Kitchen = 1,45,000" are prices, even after a line like "Note: GST extra". */
@@ -186,7 +190,7 @@ function readPrice(parsed, info, where, warn) {
 
 async function scanProject({ dir, folder, num, slug, root, warn }) {
   const infoFile = await findFile(dir, INFO_FILE);
-  const where = infoFile ? relPath(root, infoFile) : `projects/${folder}/info.txt`;
+  const where = infoFile ? relPath(root, infoFile) : `${PROJECTS_DIR}/${folder}/info.txt`;
   const parsed = parseKeyValueText((infoFile && (await readTextIfExists(infoFile))) ?? '', { sectionKeys: PRICE_KEYS, knownKeys: INFO_KNOWN });
   for (const w of parsed.warnings) warn(`${where}: ${w}`);
   const priceStart = Math.min(...Object.values(parsed.sectionStarts));
@@ -237,11 +241,12 @@ async function scanProject({ dir, folder, num, slug, root, warn }) {
     regular.set(def.key, chapter);
   }
 
+  // The story starts with the home before the work, then the finished work, each in its folder's order.
   const chapters = [];
   const ba = pairBeforeAfter(before, after);
-  if (ba.pairs.length || ba.singles.length) {
-    chapters.push({ key: 'before-after', title: 'Before and after', sub: ba.pairs.length ? 'Drag the line to compare' : '', custom: false, pairs: ba.pairs, photos: ba.singles });
-  }
+  if (ba.before.length) chapters.push({ key: 'before', title: 'Before', sub: 'The home before the work started', custom: false, photos: ba.before, pairs: [] });
+  if (ba.after.length) chapters.push({ key: 'after', title: 'After', sub: 'The finished work', custom: false, photos: ba.after, pairs: [] });
+  if (ba.pairs.length) chapters.push({ key: 'before-after', title: 'Before and after', sub: 'Drag the line to compare', custom: false, photos: [], pairs: ba.pairs });
   for (const def of CHAPTER_DEFS) {
     if (def.key === '*') {
       chapters.push(...[...regular.values()].filter((c) => c.custom).sort((a, b) => naturalCompare(a.title, b.title)));
@@ -266,7 +271,7 @@ async function scanProject({ dir, folder, num, slug, root, warn }) {
     allPhotos.push(...chapter.photos);
   }
   if (!allPhotos.length) {
-    warn(`projects/${folder} has no photos yet, so it isn't on the website. Add photos to show it.`);
+    warn(`${PROJECTS_DIR}/${folder} has no photos yet, so it isn't on the website. Add photos to its before and after folders to show it.`);
     return null;
   }
 
@@ -285,8 +290,10 @@ async function scanProject({ dir, folder, num, slug, root, warn }) {
     if (!cover) warn(`${where}: the cover photo "${info.cover}" wasn't found, so the first photo is used.`);
   }
   if (!cover) {
-    const firstRegular = chapters.find((c) => c.key !== 'before-after' && c.photos.length);
-    cover = firstRegular?.photos[0] || chapters[0]?.pairs[0]?.after || allPhotos.find((p) => p.label !== 'Before') || allPhotos[0];
+    // The finished work: the first photo in after/, then other work, and an empty-house photo only if
+    // there is nothing else.
+    const work = chapters.find((c) => !['before', 'after', 'before-after'].includes(c.key) && c.photos.length);
+    cover = after[0] || work?.photos[0] || allPhotos[0];
   }
 
   const row = [];
@@ -297,8 +304,11 @@ async function scanProject({ dir, folder, num, slug, root, warn }) {
       row.push(photo);
     }
   };
+  // The gallery shows the finished work first; before photos only fill up what is left.
   addToRow(cover);
-  for (const chapter of chapters) addToRow(chapter.key === 'before-after' ? (chapter.pairs[0]?.after || chapter.photos[0]) : chapter.photos[0]);
+  for (const chapter of chapters) {
+    if (chapter.key !== 'before') addToRow(chapter.key === 'before-after' ? chapter.pairs[0]?.after : chapter.photos[0]);
+  }
   allPhotos.filter((p) => p.chapterTitle !== 'Before').forEach(addToRow);
   allPhotos.forEach(addToRow);
 
@@ -342,7 +352,7 @@ async function scanProject({ dir, folder, num, slug, root, warn }) {
 }
 
 export async function loadProjects(root, warn) {
-  const dir = path.join(root, 'projects');
+  const dir = path.join(root, PROJECTS_DIR);
   let entries = [];
   try {
     entries = await fs.readdir(dir, { withFileTypes: true });
@@ -380,8 +390,8 @@ export async function loadProjects(root, warn) {
     slugs.add(slug);
     p.slug = slug;
     warn(p.duplicate
-      ? `Two project folders use the number ${p.duplicate}, so "projects/${p.folder}" is shown at the end of the gallery without a number. Rename it to the next free number, like "project-${suggestion}".`
-      : `"projects/${p.folder}" has no number, so it is shown at the end of the gallery. Rename it to "project-${suggestion}" to show it at the top as Project ${suggestion}.`);
+      ? `Two project folders use the number ${p.duplicate}, so "${PROJECTS_DIR}/${p.folder}" is shown at the end of the gallery without a number. Rename it to the next free number, like "project-${suggestion}".`
+      : `"${PROJECTS_DIR}/${p.folder}" has no number, so it is shown at the end of the gallery. Rename it to "project-${suggestion}" to show it at the top as Project ${suggestion}.`);
   }
 
   const projects = [];

@@ -1,0 +1,22 @@
+# This file is OPTIONAL. Without it the project still shows, as "Project 5".
+# Fill in what you like; leave the rest empty. Lines starting with # are notes for you.
+# Photos go in the two folders next to this file:
+#   before   the home before you started (empty rooms, old walls)
+#   after    the finished work
+
+Title:
+Area:
+Size:
+Days:
+Finished:
+Type:
+About:
+
+Review:
+Review by:
+Video:
+
+# Price is optional. One item per line, like:   Wardrobe = 85000
+# Leave this empty to show no price for this project.
+# A line like   Note: GST extra   is shown under the price.
+Price:

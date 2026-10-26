@@ -1,17 +1,17 @@
 // Tidies original photos before they are saved to GitHub: turns them upright, removes hidden
 // data such as the GPS location of the client's home, and shrinks them to web size.
-//   npm run clean-photos                → every photo in projects/ and site/
+//   npm run clean-photos                → every photo in images/ and site/
 //   node src/clean-photos.mjs --staged  → only photos about to be committed (used by the git hook).
 //                                         Stops the commit if a photo still has hidden data.
 import { execFileSync } from 'node:child_process';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { cleanPhotoInPlace, hasHiddenData } from './photos.mjs';
-import { PHOTO_EXTS, UNSUPPORTED_EXTS, walk } from './util.mjs';
+import { PHOTO_EXTS, PROJECTS_DIR, UNSUPPORTED_EXTS, walk } from './util.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const staged = process.argv.includes('--staged');
-const inContent = (rel) => /^(projects|site)\//i.test(rel);
+const inContent = (rel) => rel.toLowerCase().startsWith(`${PROJECTS_DIR}/`) || rel.toLowerCase().startsWith('site/');
 const firstLine = (err) => String(err && err.message ? err.message : err).split('\n')[0];
 
 let files;
@@ -19,7 +19,7 @@ if (staged) {
   const out = execFileSync('git', ['diff', '--cached', '--name-only', '-z', '--diff-filter=ACMR'], { cwd: root });
   files = out.toString('utf8').split('\0').filter(Boolean).filter(inContent);
 } else {
-  files = [...(await walk(path.join(root, 'projects'))), ...(await walk(path.join(root, 'site')))].map((f) => path.relative(root, f).split(path.sep).join('/'));
+  files = [...(await walk(path.join(root, PROJECTS_DIR))), ...(await walk(path.join(root, 'site')))].map((f) => path.relative(root, f).split(path.sep).join('/'));
 }
 
 let cleaned = 0;

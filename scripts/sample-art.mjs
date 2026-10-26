@@ -140,6 +140,24 @@ ${floor(w, h, h * 0.86, rnd)}`;
     }
     return `<rect width="${w}" height="${h}" fill="${base}"/>${strokes.join('')}<rect x="${w * 0.36}" y="${h * 0.22}" width="${w * 0.28}" height="${h * 0.36}" fill="#f3efe7" stroke="#6b4a2b" stroke-width="16"/>`;
   },
+  empty(w, h, rnd) {
+    // An empty room before the work: bare walls, a window, a cement floor and a bulb on a wire.
+    const wall = pick(rnd, ['#d8d2c6', '#d3cdc2', '#ddd6ca', '#cfc9bd']);
+    const floorTop = h * 0.74;
+    const winX = w * (0.12 + rnd() * 0.45);
+    const winW = w * 0.26;
+    const winY = h * 0.2;
+    const winH = h * 0.32;
+    const bars = [1, 2, 3].map((i) => `<rect x="${winX + (winW * i) / 4 - 3}" y="${winY}" width="6" height="${winH}" fill="#6b6259"/>`).join('');
+    const patches = Array.from({ length: 4 }, () => `<ellipse cx="${w * rnd()}" cy="${floorTop * rnd()}" rx="${40 + rnd() * 90}" ry="${20 + rnd() * 50}" fill="#bdb6aa" opacity=".35"/>`).join('');
+    const tiles = Array.from({ length: 7 }, (_, i) => `<line x1="${(w * i) / 5}" y1="${floorTop}" x2="${(w * i) / 5 - w * 0.12}" y2="${h}" stroke="#8f8981" stroke-width="3"/>`).join('');
+    const bulbX = w * (0.62 + rnd() * 0.25);
+    return `<rect width="${w}" height="${h}" fill="${wall}"/>${patches}<rect x="0" y="0" width="${w}" height="${h * 0.05}" fill="${shade(wall, -18)}"/>
+<rect x="${winX}" y="${winY}" width="${winW}" height="${winH}" fill="#cfe3ee" stroke="#8b8177" stroke-width="12"/>${bars}
+<line x1="${bulbX}" y1="0" x2="${bulbX}" y2="${h * 0.22}" stroke="#3b3631" stroke-width="3"/><circle cx="${bulbX}" cy="${h * 0.24}" r="${h * 0.025}" fill="#f6e7b0"/>
+<rect x="${w * 0.08}" y="${h * 0.5}" width="${w * 0.05}" height="${h * 0.07}" rx="4" fill="#efece6" stroke="#9c958b" stroke-width="3"/>
+<rect x="0" y="${floorTop}" width="${w}" height="${h - floorTop}" fill="#a39d94"/>${tiles}`;
+  },
   damaged(w, h, rnd) {
     const wall = '#b9b4ac';
     const cracks = [];

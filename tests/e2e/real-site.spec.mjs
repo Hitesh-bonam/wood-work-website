@@ -1,4 +1,4 @@
-// Checks the website built from YOUR projects/ and site/ folders, on every screen in the test list.
+// Checks the website built from YOUR images/ and site/ folders, on every screen in the test list.
 import { test, expect } from '@playwright/test';
 import { watchForProblems, expectAllImagesLoaded, expectNoSidewaysScroll } from './helpers.mjs';
 

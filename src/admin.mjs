@@ -1,7 +1,7 @@
 // The upload page (admin/): add a project, or photos to a project, straight from a phone.
 // It is never linked from the website and asks search engines not to list it. Its script is
 // src/assets/admin.js and its rules are in src/assets/admin-core.js. See "Add photos from your phone" in README.md.
-import { esc, scriptJson, PHOTO_EXTS } from './util.mjs';
+import { esc, scriptJson, PHOTO_EXTS, PROJECTS_DIR } from './util.mjs';
 import { CHAPTER_DEFS, INFO_FIELDS, PRICE_KEYS, BEFORE_NAMES, AFTER_NAMES } from './content.mjs';
 import { SOURCE_MAX } from './photos.mjs';
 import { DEFAULT_FAVICON } from './pages.mjs';
@@ -24,16 +24,11 @@ const CSP = [
   "form-action 'none'",
 ].join('; ');
 
+// Every project has the same two folders, so the phone offers just these two. (A project that already
+// has other folders also gets a choice for each of them; see refreshChapters in admin.js.)
 const CHAPTERS = [
   ['before', 'Before'],
   ['after', 'After'],
-  ['woodwork', 'Woodwork'],
-  ['painting', 'Painting'],
-  ['repairs', 'Repairs'],
-  ['team', 'Team at work'],
-  ['quality', 'Quality close-ups'],
-  ['materials', 'Materials'],
-  ['photos', 'Other photos'],
 ];
 
 const FIELDS = [
@@ -66,6 +61,7 @@ export function adminConfig({ repo = '', base = '/', projects = [] } = {}) {
   return {
     repo,
     base,
+    dir: PROJECTS_DIR,
     maxSide: SOURCE_MAX,
     quality: QUALITY,
     photoExts: [...PHOTO_EXTS],
@@ -157,11 +153,11 @@ ${icons}
 </section>
 
 <section class="card" aria-labelledby="up-s2">
-<h2 id="up-s2">2. What are the photos of?</h2>
-<fieldset class="up-chapters" aria-labelledby="up-s2" aria-describedby="up-chapter-hint">
-<div class="up-chips" id="up-chips">${chips}<label class="tier" id="up-custom-chip"><input type="radio" name="chapter" value="custom"><span>New chapter…</span></label></div>
+<h2 id="up-s2">2. Before or after the work?</h2>
+<p class="hint" id="up-s2-help">Before: the home before you started. After: the finished work.</p>
+<fieldset class="up-chapters" aria-labelledby="up-s2" aria-describedby="up-s2-help up-chapter-hint">
+<div class="up-chips" id="up-chips">${chips}</div>
 </fieldset>
-<div class="field" id="up-custom-field" hidden><label for="up-custom">Name of the new chapter</label><input id="up-custom" type="text" maxlength="40" autocomplete="off" autocapitalize="sentences" placeholder="Pooja room"></div>
 <p class="hint" id="up-chapter-hint" hidden></p>
 </section>
 

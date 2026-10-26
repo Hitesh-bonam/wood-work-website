@@ -38,7 +38,7 @@ test('every page is built and every link and photo works', async () => {
 });
 
 test('a damaged photo is skipped with a clear message and the rest still shows', async () => {
-  assert.ok(result.warnings.some((w) => w.includes('projects/project-4/woodwork/broken.jpg was skipped')));
+  assert.ok(result.warnings.some((w) => w.includes('images/project-4/woodwork/broken.jpg was skipped')));
   const list = JSON.parse(await read('project/4/photos.json'));
   assert.equal(list.length, 1);
 });
@@ -89,7 +89,7 @@ test('prices show on the project and on the pricing page in rupees', async () =>
 
 test('removed photos disappear from the website folder on the next build', async () => {
   const before = (await fs.readdir(path.join(out, 'assets', 'photos'))).length;
-  await fs.rm(path.join(root, 'projects', 'project-2'), { recursive: true });
+  await fs.rm(path.join(root, 'images', 'project-2'), { recursive: true });
   const again = await build({ root, out, base: FIXTURE_BASE, siteUrl: SITE });
   const after = (await fs.readdir(path.join(out, 'assets', 'photos'))).length;
   assert.equal(again.projects, 4);
@@ -99,7 +99,7 @@ test('removed photos disappear from the website folder on the next build', async
 });
 
 test('preview builds tidy new photos and add the auto-refresh script', async () => {
-  const file = await writePhoto(root, 'projects/project-12/woodwork/IMG_1234.jpg', 'wardrobe', { width: 2400, height: 1600, exif: { IFD0: { Make: 'PhoneCam' }, IFD3: { GPSLatitudeRef: 'N', GPSLatitude: '17/1 24/1 0/1' } } });
+  const file = await writePhoto(root, 'images/project-12/woodwork/IMG_1234.jpg', 'wardrobe', { width: 2400, height: 1600, exif: { IFD0: { Make: 'PhoneCam' }, IFD3: { GPSLatitudeRef: 'N', GPSLatitude: '17/1 24/1 0/1' } } });
   const devOut = path.join(root, 'preview');
   const r = await build({ root, out: devOut, base: '/', dev: true, cleanSources: true, settleMs: 0 });
   assert.ok(r.cleaned >= 1);
@@ -111,7 +111,7 @@ test('preview builds tidy new photos and add the auto-refresh script', async () 
 });
 
 test('videos, and a site with nothing in it yet, build without problems', async () => {
-  await writeText(root, 'projects/Project 10/info.txt', 'Title: Pooja room and wardrobes\nVideo: https://youtu.be/abcdefghijk\n');
+  await writeText(root, 'images/Project 10/info.txt', 'Title: Pooja room and wardrobes\nVideo: https://youtu.be/abcdefghijk\n');
   await build({ root, out, base: FIXTURE_BASE, siteUrl: SITE });
   assert.ok((await read('project/10/index.html')).includes('src="https://www.youtube-nocookie.com/embed/abcdefghijk"'));
 
@@ -129,7 +129,7 @@ test('videos, and a site with nothing in it yet, build without problems', async 
 test('a logo in site/ is used in the header and as the browser icon', async () => {
   const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'ww-logo-'));
   await writePhoto(dir, 'site/logo.png', 'plywood', { width: 900, height: 300 });
-  await writePhoto(dir, 'projects/project-1/woodwork/01-unit.jpg', 'wardrobe');
+  await writePhoto(dir, 'images/project-1/woodwork/01-unit.jpg', 'wardrobe');
   const logoOut = path.join(dir, 'dist');
   const r = await build({ root: dir, out: logoOut });
   assert.equal(r.warnings.filter((w) => w.includes('logo')).length, 0);
@@ -142,8 +142,8 @@ test('a logo in site/ is used in the header and as the browser icon', async () =
 
 test('the build refuses to write over your own folders', async () => {
   await assert.rejects(() => build({ root, out: root }), /Refusing/);
-  await assert.rejects(() => build({ root, out: path.join(root, 'projects') }), /Refusing/);
-  await assert.rejects(() => build({ root, out: path.join(root, 'projects', 'project-1') }), /Refusing/);
+  await assert.rejects(() => build({ root, out: path.join(root, 'images') }), /Refusing/);
+  await assert.rejects(() => build({ root, out: path.join(root, 'images', 'project-1') }), /Refusing/);
   await assert.rejects(() => build({ root, out: path.join(root, 'site', 'out') }), /Refusing/);
   await assert.rejects(() => build({ root, out: path.dirname(root) }), /Refusing/);
   if (process.platform === 'win32') await assert.rejects(() => build({ root, out: path.join(root, 'Projects') }), /Refusing/);
@@ -152,8 +152,8 @@ test('the build refuses to write over your own folders', async () => {
 test('even the currency sign is written safely into the page', async () => {
   const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'ww-currency-'));
   await writeText(dir, 'site/business.txt', 'Business name: X\nCurrency: <b>\n');
-  await writeText(dir, 'projects/project-1/info.txt', 'Price:\nWork = 5000\n');
-  await writePhoto(dir, 'projects/project-1/woodwork/a.jpg', 'wardrobe');
+  await writeText(dir, 'images/project-1/info.txt', 'Price:\nWork = 5000\n');
+  await writePhoto(dir, 'images/project-1/woodwork/a.jpg', 'wardrobe');
   const dirOut = path.join(dir, 'dist');
   await build({ root: dir, out: dirOut });
   const html = await fs.readFile(path.join(dirOut, 'project', '1', 'index.html'), 'utf8');
@@ -179,7 +179,7 @@ test('the preview server answers strange addresses without crashing', async () =
 });
 
 test('the build says how full the website and the photos in the repository are', () => {
-  assert.ok(result.photoBytes > 0, 'the photos in projects/ and site/ are counted');
+  assert.ok(result.photoBytes > 0, 'the photos in images/ and site/ are counted');
   const quiet = sizeReport(300 * 1024 ** 2, 500 * 1024 ** 2);
   assert.match(quiet.text, /Website size: 300 MB of 1,024 MB \(29% of the free GitHub space\)\. Photos in the repository: 500 MB of about 1,024 MB \(49%\)\./);
   assert.equal(quiet.warning, '');

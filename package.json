@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "type": "module",
-  "description": "Showcase website for a woodwork business. Every folder in projects/ becomes a project on the website.",
+  "description": "Showcase website for a woodwork business. Every folder in images/ (with before and after photos) becomes a project on the website.",
   "scripts": {
     "dev": "node src/dev.mjs",
     "build": "node src/build-cli.mjs",

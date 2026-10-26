@@ -133,9 +133,6 @@
     form: $('up-form'),
     project: $('up-project'),
     chips: $('up-chips'),
-    customChip: $('up-custom-chip'),
-    customField: $('up-custom-field'),
-    custom: $('up-custom'),
     chapterHint: $('up-chapter-hint'),
     gallery: $('up-gallery'),
     camera: $('up-camera'),
@@ -216,7 +213,6 @@
       kind: 'draft',
       project: el.project.value,
       chapter: checked ? checked.value : '',
-      custom: el.custom.value,
       edits: state.detailsReady ? detailChanges() : state.pendingEdits || {},
       photos: state.photos.filter((p) => p.ready).map((p) => ({ id: p.id, caption: p.caption, cover: p.cover })),
       memo: state.memo && state.memo.commit ? state.memo : null,
@@ -246,7 +242,6 @@
     await chooseProject(known ? edits : null);
     const radio = Array.from(el.chips.querySelectorAll('input[name="chapter"]')).find((input) => input.value === draft.chapter);
     if (radio) radio.checked = true;
-    el.custom.value = draft.custom || '';
 
     const order = new Map((draft.photos || []).map((entry, at) => [entry.id, Object.assign({ at }, entry)]));
     const place = (record) => (order.has(record.id) ? order.get(record.id).at : 1e6 + record.id);
@@ -497,23 +492,21 @@
 
   function selectedChapter() {
     const checked = el.chips.querySelector('input[name="chapter"]:checked');
-    if (!checked) return null;
-    return checked.value === 'custom' ? { key: 'custom', name: el.custom.value } : { key: checked.value };
+    return checked ? { key: checked.value } : null;
   }
 
   function chapterKey(chapter) {
     if (!chapter) return '';
-    if (chapter.key === 'custom') return core.chapterKeyOf(core.cleanFolderName(chapter.name) || '-', config);
     if (chapter.key.startsWith('dir:')) return core.chapterKeyOf(chapter.key.slice(4), config);
     return chapter.key;
   }
 
-  /** Adds the project's own chapters (like "Pooja room") as choices. */
+  /** Adds the project's other folders (like "Pooja room"), if it has any, as choices next to Before and After. */
   function refreshChapters() {
     el.chips.querySelectorAll('[data-dir]').forEach((chip) => chip.remove());
     const project = currentProject();
     if (project) {
-      project.dirs.filter((dir) => core.chapterKeyOf(dir, config).startsWith('custom:')).forEach((dir) => {
+      project.dirs.filter((dir) => !['before', 'after'].includes(core.chapterKeyOf(dir, config))).forEach((dir) => {
         const label = d.createElement('label');
         label.className = 'tier';
         label.dataset.dir = dir;
@@ -524,7 +517,7 @@
         const span = d.createElement('span');
         span.textContent = core.titleFromFolder(dir);
         label.append(input, span);
-        el.chips.insertBefore(label, el.customChip);
+        el.chips.appendChild(label);
       });
     }
     const hideCover = Boolean(project && project.hasCover);
@@ -538,11 +531,10 @@
 
   function chapterChanged() {
     const chapter = selectedChapter();
-    el.customField.hidden = !(chapter && chapter.key === 'custom');
     const key = chapterKey(chapter);
     const hints = {
-      before: 'Take each before photo from a spot you can find again, so the after photo can match it.',
-      after: 'Give each after photo the same caption as its before photo (the caption box suggests them), or add them in the same order. Your website then shows a before/after slider.',
+      before: 'Photos of the home before you started, like the empty rooms. They show on your website in the order you add them.',
+      after: 'Photos of the finished work. They show in the order you add them. Optional: give an after photo the same caption as a before photo (the caption box suggests them) and your website shows the two as a before/after slider.',
     };
     setText(el.chapterHint, hints[key] || '');
     el.captions.textContent = '';
@@ -558,17 +550,11 @@
     el.chips.querySelectorAll('input[name="chapter"]').forEach((input) => {
       input.checked = false;
     });
-    el.custom.value = '';
     chapterChanged();
   }
 
   el.chips.addEventListener('change', () => {
     sendError('');
-    chapterChanged();
-    if (!el.customField.hidden) el.custom.focus();
-    saveDraft();
-  });
-  el.custom.addEventListener('input', () => {
     chapterChanged();
     saveDraft();
   });
@@ -900,8 +886,7 @@
     if (!el.project.value) return { text: 'Choose which project the photos are for (step 1).', focus: el.project };
     if (state.preparing) return { text: 'Wait a moment: the photos are still being made ready.' };
     if (isNew && !state.photos.length) return { text: 'Add at least one photo for the new project.', focus: el.gallery };
-    if (state.photos.length && !chapter) return { text: 'Choose what the photos are of (step 2).', focus: el.chips.querySelector('input') };
-    if (state.photos.length && chapter.key === 'custom' && !core.cleanFolderName(chapter.name)) return { text: 'Type a name for the new chapter.', focus: el.custom };
+    if (state.photos.length && !chapter) return { text: 'Choose Before or After (step 2).', focus: el.chips.querySelector('input') };
     if (Object.prototype.hasOwnProperty.call(changes, 'price')) {
       const problems = core.checkPrice(changes.price, config);
       if (problems.length) {

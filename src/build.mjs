@@ -1,4 +1,4 @@
-// Turns the projects/ and site/ folders into a finished website in dist/.
+// Turns the images/ and site/ folders into a finished website in dist/.
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import os from 'node:os';
@@ -8,7 +8,7 @@ import { loadContent } from './content.mjs';
 import { cleanPhotoInPlace, processPhoto, makeShareImage, makeLogoFiles } from './photos.mjs';
 import { renderSite } from './pages.mjs';
 import { renderAdminPage, ADMIN_PAGE, ADMIN_ASSETS } from './admin.mjs';
-import { normalizeBase, walk, PHOTO_EXTS } from './util.mjs';
+import { normalizeBase, walk, PHOTO_EXTS, PROJECTS_DIR } from './util.mjs';
 
 const ASSET_DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), 'assets');
 const LIMIT = Math.max(2, Math.min(6, (os.availableParallelism?.() ?? os.cpus().length) - 1));
@@ -47,10 +47,10 @@ async function dirSize(dir) {
   return total;
 }
 
-/** How much the photos in projects/ and site/ take up in the repository. */
+/** How much the photos in images/ and site/ take up in the repository. */
 async function photoSize(root) {
   let total = 0;
-  for (const file of [...(await walk(path.join(root, 'projects'))), ...(await walk(path.join(root, 'site')))]) {
+  for (const file of [...(await walk(path.join(root, PROJECTS_DIR))), ...(await walk(path.join(root, 'site')))]) {
     if (!PHOTO_EXTS.has(path.extname(file).toLowerCase())) continue;
     try {
       total += (await fs.stat(file)).size;
@@ -67,7 +67,7 @@ function assertSafeOut(root, out) {
   const back = path.relative(fold(out), fold(root));
   const outIsRootOrAbove = back === '' || (!back.startsWith('..') && !path.isAbsolute(back));
   const inside = path.relative(fold(root), fold(out)).split(path.sep);
-  const protectedNames = ['projects', 'site', 'src', 'tests', 'scripts', '.git', '.github', '.githooks', 'node_modules'];
+  const protectedNames = [PROJECTS_DIR, 'projects', 'site', 'src', 'tests', 'scripts', '.git', '.github', '.githooks', 'node_modules'];
   const insideProtected = inside[0] !== '..' && !path.isAbsolute(inside.join(path.sep)) && protectedNames.includes(inside[0]) && !(inside[0] === 'tests' && inside[1] === '.tmp');
   if (outIsRootOrAbove || insideProtected) {
     throw new Error(`Refusing to build into "${out}" because it would delete your own files.`);
@@ -192,7 +192,7 @@ function pruneProject(project) {
 /**
  * Builds the website.
  * @param {object} options
- * @param {string} options.root          folder that holds projects/ and site/
+ * @param {string} options.root          folder that holds images/ and site/
  * @param {string} [options.out]         where the website is written (default: root/dist)
  * @param {string} [options.base]        path the site lives under, e.g. "/wood-work/" on GitHub Pages
  * @param {string} [options.siteUrl]     full address, used for link previews and the sitemap
@@ -245,7 +245,7 @@ export async function build(options) {
 
   content.projects = content.projects.filter((project) => {
     if (pruneProject(project)) return true;
-    warn(`projects/${project.folder} isn't shown because none of its photos could be read.`);
+    warn(`${PROJECTS_DIR}/${project.folder} isn't shown because none of its photos could be read.`);
     return false;
   });
   for (const key of ['materials', 'team']) {
@@ -260,7 +260,7 @@ export async function build(options) {
       project.share = await makeShareImage(project.cover.file, photoDir);
       keep.add(project.share);
     } catch (err) {
-      warn(`Couldn't make the link preview picture for projects/${project.folder} (${short(err)}).`);
+      warn(`Couldn't make the link preview picture for ${PROJECTS_DIR}/${project.folder} (${short(err)}).`);
     }
   }
   let logo = null;

@@ -2,6 +2,9 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 
+/** The owner's main photo folder: images/project-1/before, images/project-1/after, and so on. */
+export const PROJECTS_DIR = 'images';
+
 export const PHOTO_EXTS = new Set(['.jpg', '.jpeg', '.jfif', '.jpe', '.png', '.webp']);
 
 /** Files that are normal to find next to photos and are skipped without a note. */
