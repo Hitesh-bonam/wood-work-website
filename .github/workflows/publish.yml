@@ -1,0 +1,72 @@
+# Builds the website and puts it on GitHub Pages every time you push to the main branch.
+# If any link or photo is broken, nothing is published and the last good version stays online.
+name: Publish website
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - name: Get the files
+        uses: actions/checkout@v7
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24
+
+      - name: Read the GitHub Pages address
+        id: pages
+        uses: actions/configure-pages@v6
+
+      - name: Reuse the web photos made last time
+        uses: actions/cache@v6
+        with:
+          path: dist/assets/photos
+          key: web-photos-${{ github.run_id }}
+          restore-keys: web-photos-
+
+      - name: Install
+        run: npm ci
+
+      - name: Build the website
+        run: npm run build
+        env:
+          SITE_URL: ${{ steps.pages.outputs.base_url }}
+          BASE_PATH: ${{ steps.pages.outputs.base_path }}
+
+      - name: Check every link and photo
+        run: npm run check
+        env:
+          SITE_URL: ${{ steps.pages.outputs.base_url }}
+          BASE_PATH: ${{ steps.pages.outputs.base_path }}
+
+      - name: Package the website
+        uses: actions/upload-pages-artifact@v5
+        with:
+          path: dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Publish to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v5
