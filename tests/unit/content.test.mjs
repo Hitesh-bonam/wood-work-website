@@ -40,7 +40,7 @@ test('a folder without a number never changes the numbers of the others', async 
     [null, c.projects[3].slug, 'పూజ'],
   ]);
   assert.match(c.projects[3].slug, /^p-[0-9a-f]{8}$/);
-  assert.ok(w.some((m) => m.includes('Two project folders use the number 1')));
+  assert.ok(w.some((m) => m.includes('"images/project-1 copy" uses the number 1, which "images/project-1" already has') && m.includes('Rename "project-1 copy"')));
   // Every folder without a number gets its own suggestion, so following all the tips gives no clashes.
   const tips = w.map((m) => (m.match(/"project-(\d+)"/) || [])[1]).filter(Boolean);
   assert.deepEqual(tips.sort(), ['2', '3', '4']);
@@ -48,6 +48,22 @@ test('a folder without a number never changes the numbers of the others', async 
   const c2 = await loadContent(dir, () => {});
   assert.deepEqual(c2.projects.map((p) => p.slug), ['7', '1', 'kondapur-villa', 'project-1-copy', c.projects[3].slug]);
   await fs.rm(dir, { recursive: true, force: true });
+});
+
+test('a new folder with a number that is already used never takes over the published project', async () => {
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'ww-dupes-'));
+  try {
+    // "07" sorts before "project-7", but project-7 is the published one and keeps its page.
+    await writePhoto(dir, 'images/project-7/after/kitchen.jpg', 'kitchen', { width: 120, height: 90 });
+    await writePhoto(dir, 'images/07/after/new.jpg', 'wardrobe', { width: 120, height: 90 });
+    const w = [];
+    const c = await loadContent(dir, (m) => w.push(m));
+    assert.equal(c.projects.find((p) => p.num === 7).folder, 'project-7');
+    assert.equal(c.projects.find((p) => p.folder === '07').num, null);
+    assert.ok(w.some((m) => m.includes('Rename "07" (not the other one)')), w.join(' | '));
+  } finally {
+    await fs.rm(dir, { recursive: true, force: true });
+  }
 });
 
 test('folders that start with _ and projects without usable photos are left out', () => {

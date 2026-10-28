@@ -22,8 +22,9 @@ export const CHAPTER_DEFS = [
   { key: 'materials', title: 'Materials used', sub: 'What went into this home', names: ['materials', 'material', 'products', 'product', 'items', 'hardware', 'brands'] },
 ];
 const CHAPTER_BY_NAME = new Map(CHAPTER_DEFS.flatMap((def) => (def.names || []).map((name) => [name, def])));
-export const BEFORE_NAMES = ['before', 'before photos'];
-export const AFTER_NAMES = ['after', 'after photos'];
+// The usual spellings, and the usual typos, of the two folders every project has.
+export const BEFORE_NAMES = ['before', 'before photos', 'before photo', 'before pics', 'before pic', 'before images', 'before work', 'befor', 'bfore', 'beforee', 'befre', 'beofre'];
+export const AFTER_NAMES = ['after', 'after photos', 'after photo', 'after pics', 'after pic', 'after images', 'after work', 'afer', 'aftr', 'afterr', 'atfer', 'final', 'finished', 'completed'];
 const DERIVED_TYPES = ['woodwork', 'painting', 'repairs'];
 
 export const INFO_FIELDS = {
@@ -104,10 +105,22 @@ function collectPhotos(files, root, warn) {
   for (const file of files) {
     const ext = path.extname(file).toLowerCase();
     if (PHOTO_EXTS.has(ext)) photos.push(makePhoto(file, root));
-    else if (UNSUPPORTED_EXTS.has(ext)) warn(`${relPath(root, file)} is not shown. ${UNSUPPORTED_EXTS.get(ext)}`);
-    else if (!SILENT_EXTS.has(ext)) warn(`${relPath(root, file)} is not shown because it isn't a photo. Photos must be JPG, PNG or WebP.`);
+    else if (UNSUPPORTED_EXTS.has(ext)) warn(`${relPath(root, file)} is not shown, and stays on this computer (it is never uploaded). ${UNSUPPORTED_EXTS.get(ext)}`);
+    else if (!SILENT_EXTS.has(ext) && !/\(from phone\)/i.test(file)) warn(`${relPath(root, file)} is not shown because it isn't a photo, and it stays on this computer (it is never uploaded). Photos must be JPG, PNG or WebP.`);
   }
-  return photos;
+  return photos.sort((a, b) => naturalCompare(orderKey(a.rel), orderKey(b.rel)));
+}
+
+/**
+ * WhatsApp names its photos "WhatsApp Image 2026-10-11 at 9.05.12 AM": sorted by name, 1 PM would come
+ * before 9 AM. The time is read as 24-hour time, so these photos stay in the order they were taken.
+ */
+function orderKey(rel) {
+  return rel.replace(/(\d{4}-\d{2}-\d{2}) at (\d{1,2})\.(\d{2})\.(\d{2})\s*([AP]M)/gi, (all, date, h, m, s, ampm) => {
+    let hour = Number(h) % 12;
+    if (/pm/i.test(ampm)) hour += 12;
+    return `${date} at ${String(hour).padStart(2, '0')}.${m}.${s}`;
+  });
 }
 
 /**
@@ -274,6 +287,11 @@ async function scanProject({ dir, folder, num, slug, root, warn }) {
     warn(`${PROJECTS_DIR}/${folder} has no photos yet, so it isn't on the website. Add photos to its before and after folders to show it.`);
     return null;
   }
+  // A job still in progress (only empty-house photos) waits until its finished work is added.
+  if (!coverPhoto && chapters.every((c) => c.key === 'before')) {
+    warn(`${PROJECTS_DIR}/${folder} has only before photos, so it isn't on the website yet. It appears as soon as you add photos of the finished work to its "after" folder.`);
+    return null;
+  }
 
   let cover = coverPhoto;
   if (!cover && info.cover) {
@@ -363,17 +381,35 @@ export async function loadProjects(root, warn) {
     .filter((e) => e.isDirectory() && !isHiddenName(e.name) && !/^templates?$/i.test(e.name))
     .map((e) => e.name)
     .sort(naturalCompare);
+  // Photos the website can't place are pointed out instead of being silently left out.
+  for (const e of entries) {
+    if (e.isFile() && PHOTO_EXTS.has(path.extname(e.name).toLowerCase())) {
+      warn(`${PROJECTS_DIR}/${e.name} is not in a project folder, so it isn't shown. Put it in a project's "before" or "after" folder.`);
+    } else if (e.isDirectory() && (isHiddenName(e.name) || /^templates?$/i.test(e.name))) {
+      const photos = (await walk(path.join(dir, e.name))).filter((f) => PHOTO_EXTS.has(path.extname(f).toLowerCase()));
+      if (photos.length) warn(`${PROJECTS_DIR}/${e.name} has photos but isn't shown: folders starting with _ (and "template") are skipped. Rename it to the next number, like "project-${Math.max(0, ...entries.map((x) => Number((x.name.match(/^project-(\d+)$/i) || [])[1] || 0))) + 1}".`);
+    }
+  }
 
   // A project's number comes only from its folder name, so it never changes when other projects are added.
-  const used = new Set();
-  const planned = folders.map((folder) => {
+  // When two folders ask for the same number, the one spelled exactly "project-N" keeps it (that is how
+  // the template and the phone name projects), so a newly added folder never takes over a published page.
+  const numberOf = (folder) => {
     const match = folder.match(/^(?:project|proj|p)?[\s_.-]*(\d{1,3})(?!\d)/i);
-    const num = match ? Number(match[1]) : 0;
-    if (num > 0 && !used.has(num)) {
-      used.add(num);
-      return { folder, num };
-    }
-    return { folder, num: null, duplicate: num > 0 ? num : 0 };
+    return match ? Number(match[1]) : 0;
+  };
+  const owner = new Map();
+  for (const folder of folders) {
+    const num = numberOf(folder);
+    if (!num) continue;
+    const current = owner.get(num);
+    if (!current || (/^project-\d+$/i.test(folder) && !/^project-\d+$/i.test(current))) owner.set(num, folder);
+  }
+  const used = new Set(owner.keys());
+  const planned = folders.map((folder) => {
+    const num = numberOf(folder);
+    if (num > 0 && owner.get(num) === folder) return { folder, num };
+    return { folder, num: null, duplicate: num > 0 ? num : 0, keeper: num > 0 ? owner.get(num) : '' };
   });
   // Each folder without a number is offered its own free number, so following every tip gives no clashes.
   let next = Math.max(0, ...used) + 1;
@@ -390,7 +426,7 @@ export async function loadProjects(root, warn) {
     slugs.add(slug);
     p.slug = slug;
     warn(p.duplicate
-      ? `Two project folders use the number ${p.duplicate}, so "${PROJECTS_DIR}/${p.folder}" is shown at the end of the gallery without a number. Rename it to the next free number, like "project-${suggestion}".`
+      ? `"${PROJECTS_DIR}/${p.folder}" uses the number ${p.duplicate}, which "${PROJECTS_DIR}/${p.keeper}" already has, so it is shown at the end of the gallery without a number. Rename "${p.folder}" (not the other one) to the next free number, like "project-${suggestion}".`
       : `"${PROJECTS_DIR}/${p.folder}" has no number, so it is shown at the end of the gallery. Rename it to "project-${suggestion}" to show it at the top as Project ${suggestion}.`);
   }
 

@@ -74,6 +74,12 @@ matter (`Before`, `AFTER` and `Info.txt` all work).
 - **Any photo from your phone works** (JPG, PNG, WebP or JFIF). Photos are automatically turned upright, made smaller for the web
   (a 5 MB phone photo becomes about 200 KB), and **the GPS location is removed** so your clients'
   addresses are never shared.
+- **The copies in `images/` are made smaller** (at most 2000 pixels) the first time PREVIEW or PUBLISH sees
+  them. Keep your full-size originals in your phone's gallery or Google Photos.
+- **Only photos and `info.txt` are uploaded.** Anything else you put in `images/` (PDFs, quotations, notes,
+  videos, ZIP files) stays on your computer and is never made public.
+- **A job still in progress** (only before photos) is not shown yet. It appears as soon as you add photos
+  to its `after` folder.
 - **The file name becomes the caption:** `master-wardrobe-sliding-doors.jpg` shows as
   "Master wardrobe sliding doors". Phone names like `IMG_2041.jpg` are fine; they just show no caption.
 - **Optional slider:** give a before photo and an after photo the **same name** (for example
@@ -129,8 +135,19 @@ There is only one website and one GitHub repository. Photos added from your phon
 the same `images/` folders on GitHub. PUBLISH.cmd and PREVIEW.cmd bring them down into this folder,
 and PUBLISH.cmd sends your computer's photos up, so both sides always end up with everything.
 
-If the same file was changed on both sides, PUBLISH.cmd stops and names the file. Nothing is lost:
-give one of the photos a different name and run it again.
+If the phone and this computer changed the same thing, nothing is lost and nothing gets stuck:
+- **Same photo name on both:** both photos are kept; yours gets "-pc" added (for example `kitchen-pc.jpg`).
+- **Same `info.txt` changed on both:** your computer's version is kept, and the phone's version is saved
+  next to it as `info (from phone).txt` (it stays on your computer). Copy anything you need from it,
+  then delete it.
+- **A new project made on the phone and on the computer with the same number:** yours moves to the next
+  free number, and PUBLISH tells you which.
+
+PUBLISH.cmd tells you each time it does one of these.
+
+**On a new or second computer:** install GitHub Desktop, clone the repository, then double-click
+`PREVIEW.cmd` once (it sets everything up, including the check that removes GPS locations) before you
+use `PUBLISH.cmd`.
 
 ## Add photos from your phone
 
