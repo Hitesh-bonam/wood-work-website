@@ -63,6 +63,11 @@ const BUSINESS_FIELDS = {
   youtube: ['youtube', 'youtube channel'],
   about: ['about', 'about us'],
   currency: ['currency'],
+  parent: ['parent company', 'part of', 'group company'],
+  taglineTe: ['tagline telugu', 'telugu tagline'],
+  aboutTe: ['about telugu', 'telugu about'],
+  warrantyTe: ['warranty telugu', 'telugu warranty'],
+  googleVerification: ['google verification', 'google site verification'],
 };
 
 function pick(fields, map) {
@@ -525,7 +530,41 @@ async function loadBusiness(root, warn) {
     youtube: social(b.youtube, 'youtube'),
     about: b.about || '',
     currency,
+    parent: b.parent || '',
+    taglineTe: b.taglineTe || '',
+    aboutTe: b.aboutTe || '',
+    warrantyTe: b.warrantyTe || '',
+    googleVerification: String(b.googleVerification || '').replace(/^.*content="([^"]+)".*$/, '$1').trim(),
   };
+}
+
+/** site/<name>.txt with lines like   Free site visit = We come, measure and listen.   (services, How we work). */
+const siteFile = (name) => new RegExp(`^${name}(\\.txt)+$`, 'i');
+
+async function loadSteps(root, name, warn) {
+  const file = await findFile(path.join(root, 'site'), siteFile(name));
+  const text = file && (await readTextIfExists(file));
+  if (text == null) return [];
+  const parsed = parseKeyValueText(text);
+  for (const w of parsed.warnings) warn(`site/${name}.txt: ${w}`);
+  return parsed.entries.filter((e) => e.value).map((e) => ({ title: e.rawKey, text: e.value }));
+}
+
+/** site/<name>.txt with   Q: question   lines, each followed by an   A: answer   line. */
+async function loadFaq(root, name, warn) {
+  const file = await findFile(path.join(root, 'site'), siteFile(name));
+  const text = file && (await readTextIfExists(file));
+  if (text == null) return [];
+  const parsed = parseKeyValueText(text);
+  for (const w of parsed.warnings) warn(`site/${name}.txt: ${w}`);
+  const faq = [];
+  for (const e of parsed.entries) {
+    if (['q', 'question'].includes(e.key)) faq.push({ q: e.value, a: '' });
+    else if (['a', 'answer'].includes(e.key) && faq.length && !faq[faq.length - 1].a) faq[faq.length - 1].a = e.value;
+    else warn(`site/${name}.txt line ${e.line}: start each question with "Q:" and its answer with "A:".`);
+  }
+  for (const item of faq.filter((f) => !f.a)) warn(`site/${name}.txt: the question "${item.q}" has no answer ("A: ..." on the next line), so it isn't shown.`);
+  return faq.filter((f) => f.q && f.a);
 }
 
 /** "1200 / 1700 per sq ft" → { std: 1200, prem: 1700, unit: 'sq ft' }. */
@@ -574,5 +613,10 @@ export async function loadContent(root, warn) {
   const materials = await loadShowcase(path.join(root, 'site', 'materials'), root, warn);
   const team = await loadShowcase(path.join(root, 'site', 'team'), root, warn);
   const logo = await findLogo(root);
-  return { business, rates, projects, materials, team, logo };
+  // English and Telugu versions of the home page's extra sections. A Telugu file that is missing
+  // falls back to the English one.
+  const extras = { en: { services: await loadSteps(root, 'services', warn), process: await loadSteps(root, 'process', warn), faq: await loadFaq(root, 'faq', warn) } };
+  const te = { services: await loadSteps(root, 'services-telugu', warn), process: await loadSteps(root, 'process-telugu', warn), faq: await loadFaq(root, 'faq-telugu', warn) };
+  extras.te = { services: te.services.length ? te.services : extras.en.services, process: te.process.length ? te.process : extras.en.process, faq: te.faq.length ? te.faq : extras.en.faq };
+  return { business, rates, projects, materials, team, logo, extras };
 }

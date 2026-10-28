@@ -87,8 +87,8 @@ export function textLines(page) {
     const visible = (el) => el.getClientRects().length > 0 && getComputedStyle(el).visibility !== 'hidden';
     return {
       menus: [...document.querySelectorAll('.nav-desk a, .tabbar a span, .chip, .chap-in a, .pj-all, .top-wa .lbl')].filter(visible).map((el) => ({ text: el.textContent.trim(), lines: lines(el) })),
-      brand: [...document.querySelectorAll('.brand span')].filter(visible).map((el) => lines(el))[0] || 1,
-      brandWidth: Math.round(document.querySelector('.brand span').getBoundingClientRect().width),
+      brand: [...document.querySelectorAll('.brand > span:last-child')].filter(visible).map((el) => lines(el))[0] || 1,
+      brandWidth: Math.round(document.querySelector('.brand > span:last-child').getBoundingClientRect().width),
     };
   });
 }

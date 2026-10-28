@@ -32,9 +32,17 @@ test('every page is built and every link and photo works', async () => {
     assert.ok(await exists(`project/${slug}/index.html`), `project ${slug}`);
     assert.ok(Array.isArray(JSON.parse(await read(`project/${slug}/photos.json`))));
   }
+  // Every page also exists in Telugu under te/, with the same photos.
+  for (const rel of ['te/index.html', 'te/pricing/index.html', 'te/materials/index.html', 'te/contact/index.html', 'te/project/1/index.html', 'te/project/1/photos.json']) {
+    assert.ok(await exists(rel), rel);
+  }
+  const te = await read('te/index.html');
+  assert.match(te, /<html lang="te">/);
+  assert.match(te, /మా పనులు/);
+  assert.match(te, /hreflang="en"/);
   const { problems, pages } = await checkSite(out, FIXTURE_BASE);
   assert.deepEqual(problems, []);
-  assert.equal(pages, 11, 'ten public pages and the upload page (admin/)');
+  assert.equal(pages, 20, 'nine public pages in English and in Telugu, the 404 page and the upload page (admin/)');
 });
 
 test('a damaged photo is skipped with a clear message and the rest still shows', async () => {

@@ -28,7 +28,7 @@ test.describe('gallery', () => {
       if (total > shown) {
         await expect(more).toBeVisible();
         await expect(more.locator('[aria-hidden="true"]:visible')).toHaveText(`+${total - shown}`);
-        await expect(more).toHaveAccessibleName(`See all ${total} photos of project ${num}`);
+        await expect(more).toHaveAccessibleName(`See all ${total} photos of Project ${num}`);
       } else {
         await expect(more).toBeHidden();
       }

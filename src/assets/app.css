@@ -1,15 +1,18 @@
 /* Woodwork website styles. Mobile first: base rules are for phones, @media blocks add tablet and laptop. */
 :root {
-  --bg: #faf7f2;
-  --surface: #ffffff;
-  --ink: #2a2118;
-  --ink-2: #5e5246;
-  --ink-3: #75685b;
-  --line: #e9e1d6;
-  --wood: #8a5a2b;
-  --wood-dark: #6b421c;
-  --wood-50: #f5ece1;
-  --wood-100: #ebdcc8;
+  --bg: #f7f3ee;
+  --surface: #fffdfa;
+  --ink: #1f1a16;
+  --ink-2: #574c42;
+  --ink-3: #6f6257;
+  --line: #e6ddd1;
+  --wood: #7a4b25;
+  --wood-dark: #5b3a22;
+  --wood-50: #f3ebe0;
+  --wood-100: #e7d8c4;
+  --brass: #b08a4f;
+  --brass-2: #e3c48f;
+  --night: #1c1612;
   --wa: #1a7f4b;
   --wa-dark: #136339;
   --focus: #c9852f;
@@ -23,7 +26,7 @@
   --pad-left: max(var(--gutter), env(safe-area-inset-left, 0px));
   --pad-right: max(var(--gutter), env(safe-area-inset-right, 0px));
   --font: system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans", "Helvetica Neue", Arial, sans-serif;
-  --serif: Georgia, "Iowan Old Style", "Palatino Linotype", "Noto Serif", "Times New Roman", serif;
+  --serif: "Iowan Old Style", "Palatino Linotype", "Book Antiqua", Palatino, "Noto Serif", Georgia, serif;
   color-scheme: light;
 }
 
@@ -43,13 +46,17 @@ body {
   background: var(--bg);
   color: var(--ink);
   font: 400 1rem/1.6 var(--font);
+  font-variant-numeric: lining-nums;
   padding-bottom: calc(var(--tab-h) + env(safe-area-inset-bottom, 0px));
   overflow-wrap: anywhere;
 }
 
 img { max-width: 100%; height: auto; display: block; }
 a { color: var(--wood-dark); }
-h1, h2, h3 { font-family: var(--serif); font-weight: 700; line-height: 1.2; margin: 0; color: var(--ink); overflow-wrap: break-word; }
+h1, h2, h3 { font-family: var(--serif); font-weight: 700; line-height: 1.2; margin: 0; color: var(--ink); overflow-wrap: break-word; font-variant-numeric: lining-nums; }
+/* Telugu pages: Telugu fonts that come with phones and computers. */
+.lang-te { --font: "Noto Sans Telugu", "Nirmala UI", "Gautami", system-ui, sans-serif; --serif: "Noto Serif Telugu", "Noto Sans Telugu", "Nirmala UI", "Gautami", serif; }
+.lang-te body, body.lang-te { line-height: 1.7; }
 p { margin: 0; }
 button, input, select { font: inherit; }
 .i { width: 20px; height: 20px; flex: none; }
@@ -148,7 +155,7 @@ main:focus { outline: none; }
 /* A wide logo never takes the business name's room. */
 .brand img { height: 28px; width: auto; max-width: 64px; object-fit: contain; object-position: left center; flex: none; }
 /* The business name may take two lines; only a very long one is shortened, with "…". */
-.brand span {
+.brand > span:last-child {
   display: -webkit-box;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
@@ -240,7 +247,8 @@ main:focus { outline: none; }
   font-size: 0.9rem;
   cursor: pointer;
 }
-.chip[aria-pressed="true"] { background: var(--wood); border-color: var(--wood); color: #fff; }
+.chip:hover { border-color: var(--wood); color: var(--wood-dark); }
+.chip[aria-pressed="true"] { background: var(--wood-dark); border-color: var(--wood-dark); color: #fff; }
 .none, .empty { padding: 24px 0; color: var(--ink-2); }
 
 .pj { padding: 16px 0 18px; border-top: 1px solid var(--line); }
@@ -580,8 +588,140 @@ dialog.viewer::backdrop { background: #111; }
 .dev-notes li + li { margin-top: 6px; }
 @media (min-width: 768px) { .dev-notes { bottom: 12px; } }
 
+/* ---------- Premium studio ---------- */
+
+/* Text logo: monogram and name */
+.mono {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  background: var(--night);
+  color: #f1e2c8;
+  font: 700 0.98rem/1 var(--serif);
+  letter-spacing: 0.05em;
+  box-shadow: inset 0 0 0 1.5px rgba(196, 154, 90, 0.8), inset 0 0 0 4px var(--night);
+}
+.brand-txt .bn, .brand-txt .bs { display: block; }
+.bn { font-family: var(--serif); font-weight: 700; font-size: 1.08rem; letter-spacing: 0.01em; color: var(--ink); }
+.bs { margin-top: 2px; font: 600 0.62rem/1.2 var(--font); letter-spacing: 0.34em; text-transform: uppercase; color: var(--wood); }
+.lang { display: inline-flex; align-items: center; min-height: 40px; padding: 0 10px; border-radius: 999px; color: var(--ink-2); font-weight: 600; font-size: 0.9rem; text-decoration: none; white-space: nowrap; }
+.lang:hover { background: var(--wood-50); color: var(--wood-dark); }
+
+/* Buttons: deep walnut, with a soft lift on hover */
+.btn.primary { background: var(--wood-dark); border-color: var(--wood-dark); }
+.btn.primary:hover { background: var(--night); border-color: var(--night); }
+.btn { transition: background-color .2s, border-color .2s, color .2s, transform .2s, box-shadow .2s; }
+.btn:hover { transform: translateY(-1px); box-shadow: 0 6px 16px rgba(31, 26, 22, 0.1); }
+
+/* Home hero: the newest project's finished work, full width */
+.hero { position: relative; }
+.hero.has-media { display: flex; align-items: flex-end; min-height: min(76vh, 660px); padding: 120px 0 34px; overflow: hidden; background: var(--night); color: #fff; }
+.hero-media { position: absolute; inset: 0; }
+.hero-media img { width: 100%; height: 100%; object-fit: cover; }
+.hero.has-media::after { content: ""; position: absolute; inset: 0; background: linear-gradient(180deg, rgba(20, 14, 10, 0.1) 0%, rgba(20, 14, 10, 0.35) 42%, rgba(20, 14, 10, 0.86) 100%); }
+.hero-in { position: relative; z-index: 1; }
+.hero-k { margin-bottom: 10px; font-size: 0.76rem; font-weight: 600; letter-spacing: 0.2em; text-transform: uppercase; color: var(--wood); }
+.hero.has-media .hero-k { color: var(--brass-2); }
+.hero.has-media h1 { color: #fff; font-size: clamp(2.3rem, 8.5vw, 4.4rem); letter-spacing: -0.01em; line-height: 1.05; }
+.hero.has-media .tagline { max-width: 40ch; color: rgba(255, 255, 255, 0.9); font-size: clamp(1.05rem, 2.4vw, 1.3rem); }
+.trust li { display: inline-flex; align-items: center; gap: 6px; }
+.trust .i { width: 15px; height: 15px; }
+.hero.has-media .trust li { background: rgba(255, 255, 255, 0.12); border: 1px solid rgba(255, 255, 255, 0.24); color: #fff; }
+.hero.has-media .trust .i { color: var(--brass-2); }
+.hero.has-media .btn:not(.wa) { background: rgba(255, 253, 250, 0.95); border-color: transparent; color: var(--ink); }
+
+/* Section titles */
+.sec-title { font-size: clamp(1.6rem, 4.2vw, 2.4rem); letter-spacing: -0.005em; }
+.sec-title::after { content: ""; display: block; width: 44px; height: 2px; margin-top: 12px; background: var(--brass); }
+.gal-head .sec-title::after { display: none; }
+
+/* What we do */
+.services { margin-top: 52px; }
+.svc-grid { display: grid; grid-template-columns: 1fr; gap: 14px; margin: 22px 0 0; padding: 0; list-style: none; }
+.svc { padding: 22px 22px 24px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); transition: border-color .2s, box-shadow .2s, transform .2s; }
+.svc:hover { border-color: var(--brass); box-shadow: 0 10px 28px rgba(31, 26, 22, 0.08); transform: translateY(-2px); }
+.svc .i { width: 34px; height: 34px; color: var(--wood); stroke-width: 1.6; }
+.svc h3 { margin: 14px 0 6px; font-size: 1.16rem; }
+.svc p { color: var(--ink-2); font-size: 0.95rem; }
+
+/* How we work: a dark band with numbered steps */
+.process { margin-top: 64px; padding: 56px 0 60px; background: var(--night); color: #efe4d6; }
+.process .sec-title { color: #fff; }
+.steps { display: grid; gap: 24px; margin: 26px 0 0; padding: 0; list-style: none; }
+.step { display: flex; gap: 16px; align-items: flex-start; }
+.step-n { flex: none; display: grid; place-items: center; width: 44px; height: 44px; border: 1px solid var(--brass); border-radius: 50%; color: var(--brass-2); font: 700 1.15rem/1 var(--serif); }
+.step h3 { margin-bottom: 4px; color: #fff; font-size: 1.1rem; }
+.step p { color: rgba(239, 228, 214, 0.8); font-size: 0.95rem; }
+
+/* Questions people ask */
+.faq { margin-top: 60px; }
+.faq-list { max-width: 860px; margin-top: 18px; border-top: 1px solid var(--line); }
+.faq-item { border-bottom: 1px solid var(--line); }
+.faq-item summary { display: flex; align-items: center; justify-content: space-between; gap: 16px; min-height: 48px; padding: 16px 2px; font-weight: 600; font-size: 1.02rem; list-style: none; cursor: pointer; }
+.faq-item summary::-webkit-details-marker { display: none; }
+.faq-item summary:hover { color: var(--wood-dark); }
+.faq-item summary .i { color: var(--wood); transition: transform .2s; }
+.faq-item[open] summary .i { transform: rotate(180deg); }
+.faq-item p { max-width: 70ch; padding: 0 2px 18px; color: var(--ink-2); }
+
+/* Free site visit band */
+.cta-band { margin-top: 64px; background: linear-gradient(135deg, #2a1c13 0%, #5b3a22 100%); color: #f6ecdf; }
+.cta-in { display: grid; justify-items: center; gap: 12px; padding-top: 50px; padding-bottom: 54px; text-align: center; }
+.cta-band h2 { color: #fff; font-size: clamp(1.6rem, 4.6vw, 2.5rem); }
+.cta-band p { max-width: 52ch; color: rgba(246, 236, 223, 0.86); }
+.cta-band .btn-row { justify-content: center; margin-top: 6px; }
+.cta-band .btn:not(.wa) { background: transparent; border-color: rgba(255, 255, 255, 0.5); color: #fff; }
+body:has(.cta-band) .foot { margin-top: 0; }
+
+/* Footer: dark, with the logo */
+.foot { background: var(--night); border-top: 0; color: #cbbca9; }
+.foot-name, .foot .bn { color: #fff; }
+.foot .bs { color: var(--brass-2); }
+.foot-name { display: flex; align-items: center; gap: 10px; }
+.foot-parent { margin-top: 6px; color: var(--brass-2); font-size: 0.82rem; letter-spacing: 0.04em; }
+.foot-tag { margin-top: 6px; color: #b9a995; }
+.foot-contact a, .foot-contact span { color: #e2d5c4; }
+.foot-contact a:hover { color: #fff; }
+.foot-small { color: #9a8a77; }
+
+/* Gentle entrance as sections come into view (only with the script, never with reduced motion) */
+/* Movement only: the words stay fully readable even before the section slides in. */
+.js-reveal .reveal { transform: translateY(18px); transition: transform .7s cubic-bezier(.2, .7, .2, 1); }
+.js-reveal .reveal.shown { transform: none; }
+
+/* Hover feedback */
+.chap-in a:hover { border-color: var(--wood); color: var(--wood-dark); }
+.tile.more:hover { background: var(--wood-100); }
+.mcard a img { transition: transform .35s ease; }
+.mcard a:hover img { transform: scale(1.03); }
+.crumb a:hover, .back-all a:hover { color: var(--wood-dark); }
+
+@media (min-width: 640px) {
+  .svc-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (min-width: 1024px) {
+  .svc-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 18px; }
+  .steps { grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 26px; }
+  .step { flex-direction: column; }
+  .hero.has-media { padding-bottom: 56px; }
+  .mono { width: 42px; height: 42px; font-size: 1.05rem; }
+  .bn { font-size: 1.2rem; }
+}
+.l-short { display: none; }
+@media (max-width: 479px) {
+  .lang { min-width: 34px; justify-content: center; padding: 0 6px; font-size: 0.9rem; }
+  .l-long { display: none; }
+  .l-short { display: inline; }
+  .top-in { gap: 8px; }
+}
+
 /* Very small phones */
 @media (max-width: 400px) {
+  .mono { width: 34px; height: 34px; font-size: 0.9rem; }
+  .brand { gap: 8px; }
   .card { padding: 16px 12px; }
   th, td { padding-left: 4px; padding-right: 4px; }
 }

@@ -102,6 +102,23 @@ matter (`Before`, `AFTER` and `Info.txt` all work).
 - A project's price is optional. If you don't want to show a price, leave it out of `info.txt`
   completely (see "Privacy" below).
 
+### Home page sections, in English and Telugu
+
+The home page has "What we do", "How we work" and "Questions people ask". Their words are in plain
+text files in `site/`. Each English file has a Telugu partner; if a Telugu file is missing, the
+Telugu page shows the English words instead.
+
+| Section | English | Telugu |
+| --- | --- | --- |
+| What we do | `services.txt` (`Service = one short sentence`) | `services-telugu.txt` |
+| How we work | `process.txt` (`Step = one or two sentences`) | `process-telugu.txt` |
+| Questions | `faq.txt` (`Q:` question, then `A:` answer) | `faq-telugu.txt` |
+
+In `business.txt`, `Tagline Telugu`, `About Telugu` and `Warranty Telugu` are the Telugu versions of
+those lines. `Parent company` shows as "A … company" under the name (leave it empty to hide it).
+Everything else on the site (menus, buttons) is translated already. The Telugu website is at the
+same address with `/te/` added; the తెలుగు / EN button at the top switches between them.
+
 ## See the website on your computer
 
 Double-click **`PREVIEW.cmd`**. Your browser opens the website. Keep the black window open;
