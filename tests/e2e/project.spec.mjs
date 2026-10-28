@@ -56,7 +56,21 @@ test.describe('project page', () => {
     await expect(slider).toHaveValue('75');
     // A before photo without a partner of the same name is shown in the Before chapter, not paired up.
     await expect(page.locator('#ch-before-after [data-ba]')).toHaveCount(2);
-    await expect(page.locator('#ch-before .ptile a')).toHaveAttribute('aria-label', 'Open photo: Before: Extra corner, project 1');
+    await expect(page.locator('#ch-before .ptile a')).toHaveAttribute('aria-label', 'Open photo: Before: Extra corner, Kitchen & "Dining" <Room>, North');
+    await expect(page.locator('#ch-before .ptile img')).toHaveAttribute('alt', 'Before: Extra corner, Kitchen & "Dining" <Room>, North');
+  });
+
+  test('on short laptop screens the slider is exactly as wide as its photo', async ({ page, isMobile }) => {
+    test.skip(isMobile, 'laptop screens');
+    for (const size of [{ width: 1280, height: 720 }, { width: 1366, height: 768 }, { width: 1920, height: 1080 }]) {
+      await page.setViewportSize(size);
+      await page.goto('project/1/');
+      const figure = page.locator('[data-ba]').first();
+      const frame = await figure.locator('.ba-frame').boundingBox();
+      const slider = await figure.getByRole('slider').boundingBox();
+      expect(Math.abs(slider.width - frame.width), `slider and photo widths at ${size.width}x${size.height}`).toBeLessThan(2);
+      expect(frame.height, 'the photo fits on the screen').toBeLessThanOrEqual(size.height * 0.78 + 1);
+    }
   });
 
   test('scrolling with a finger over the before/after photo does not move the line', async ({ page }) => {

@@ -339,7 +339,7 @@ main:focus { outline: none; }
 .ptag { position: absolute; left: 8px; top: 8px; padding: 2px 10px; border-radius: 999px; background: rgba(0, 0, 0, 0.6); color: #fff; font-size: 0.78rem; font-weight: 600; }
 
 /* Before and after */
-.ba { margin: 0 0 18px; max-width: 900px; }
+.ba { margin: 0 0 18px; max-width: min(900px, calc(78vh * var(--ar, 1.3333))); }
 .ba-frame {
   position: relative;
   max-height: 78vh;

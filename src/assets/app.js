@@ -34,6 +34,37 @@
     el.hidden = false;
   });
 
+  /* Photos load as you scroll: a photo gets its sharper sizes about one screen before it is reached, so
+     a long project page on a phone doesn't download every big photo at once. */
+  const sharpen = (im) => {
+    if (!im.dataset.srcset) return;
+    im.sizes = im.dataset.sizes || '100vw';
+    im.srcset = im.dataset.srcset;
+    im.removeAttribute('data-srcset');
+  };
+  const later = $$('img[data-srcset]');
+  if (later.length && 'IntersectionObserver' in window) {
+    const watcher = new IntersectionObserver((entries) => {
+      entries.forEach((entry) => {
+        if (!entry.isIntersecting) return;
+        watcher.unobserve(entry.target);
+        sharpen(entry.target);
+      });
+    }, { rootMargin: '100% 0px' });
+    later.forEach((im) => watcher.observe(im));
+  } else {
+    later.forEach(sharpen);
+  }
+
+  /** The photo file that fills this screen sharply: no bigger than needed, never blurry. */
+  const fitting = (p) => {
+    if (!p || !Array.isArray(p.v) || !p.v.length) return p && (p.l || p.s);
+    const ratio = p.w && p.h ? p.w / p.h : 1;
+    const need = Math.min(window.innerWidth, window.innerHeight * ratio) * (window.devicePixelRatio || 1);
+    const pick = p.v.find(([, w]) => w >= need * 0.9) || p.v[p.v.length - 1];
+    return pick[0];
+  };
+
   const canDialog = typeof HTMLDialogElement === 'function' && typeof HTMLDialogElement.prototype.showModal === 'function';
 
   /* Stops the click that follows a swipe or a long press. */
@@ -216,12 +247,24 @@
       const token = ++state.token;
       img.alt = p.alt || p.c || 'Photo';
       img.src = p.s || p.l;
-      if (p.l && p.l !== p.s) {
+      const n2 = state.list.length;
+      // The photos next to this one start loading only once this one is sharp, so it isn't slowed down.
+      const neighbours = () => {
+        if (n2 < 2 || token !== state.token) return;
+        const q = state.list[(state.i + 1) % n2];
+        if (q && q !== p) new Image().src = fitting(q);
+      };
+      const want = fitting(p);
+      if (want && want !== p.s) {
         const big = new Image();
         big.onload = () => {
-          if (token === state.token && dlg.open) img.src = p.l;
+          if (token === state.token && dlg.open) img.src = want;
+          neighbours();
         };
-        big.src = p.l;
+        big.onerror = neighbours;
+        big.src = want;
+      } else {
+        neighbours();
       }
       title.textContent = n > 1 ? `${state.name ? `${state.name} · ` : ''}${state.i + 1} / ${n}` : state.name;
       cap.textContent = '';
@@ -234,12 +277,6 @@
       if (p.c) cap.appendChild(d.createTextNode(p.c));
       prev.hidden = n < 2;
       next.hidden = n < 2;
-      if (n > 1) {
-        [state.i + 1, state.i - 1].forEach((k) => {
-          const q = state.list[(k + n) % n];
-          if (q && q !== p) new Image().src = q.l || q.s;
-        });
-      }
     }
     function show(i) {
       const n = state.list.length;
@@ -407,17 +444,18 @@
       chapter.textContent = p.ch || '';
       caption.textContent = p.c || '';
       const pic = new Image();
+      // The next photo starts loading once this one is ready, so this one isn't slowed down.
+      const after = list[i + 1];
       pic.onload = () => {
         if (t !== token) return;
         img.src = pic.src;
         ready = true;
+        if (after) new Image().src = fitting(after);
       };
       pic.onerror = () => {
         if (t === token) ready = true;
       };
-      pic.src = p.l || p.s;
-      const after = list[i + 1];
-      if (after) new Image().src = after.l || after.s;
+      pic.src = fitting(p);
       paintBars();
     }
     function tick(now) {

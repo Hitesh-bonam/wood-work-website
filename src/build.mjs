@@ -234,9 +234,8 @@ export async function build(options) {
   await pool(files, LIMIT, async (file) => {
     try {
       const result = await processPhoto(file, photoDir);
-      for (const photo of byFile.get(file)) Object.assign(photo, { s: result.s, l: result.l });
-      keep.add(result.s.name);
-      keep.add(result.l.name);
+      for (const photo of byFile.get(file)) Object.assign(photo, { s: result.s, l: result.l, v: result.v });
+      for (const variant of result.v) keep.add(variant.name);
     } catch (err) {
       for (const photo of byFile.get(file)) photo.failed = true;
       warn(`${path.relative(root, file).split(path.sep).join('/')} was skipped because it couldn't be read as a photo (${short(err)}).`);

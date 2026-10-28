@@ -48,7 +48,10 @@ function helpers(ctx) {
     // A before or after photo says so, wherever it is shown (the gallery, the viewer, the story).
     const tag = p.label || (['Before', 'After'].includes(p.chapterTitle) ? p.chapterTitle : '');
     const what = p.caption ? (tag ? `${tag}: ${p.caption}` : p.caption) : p.chapterTitle ? `${p.chapterTitle} photo` : 'Photo';
-    return project ? `${what}, ${ref(project)}` : what;
+    // Named after the project's title and area when it has one ("Modular kitchen, Gachibowli"), so the
+    // description means something to Google Images and to people using screen readers.
+    const where = project ? (project.title ? [project.title, project.area].filter(Boolean).join(', ') : ref(project)) : '';
+    return where ? `${what}, ${where}` : what;
   };
   return {
     u,
@@ -61,15 +64,24 @@ function helpers(ctx) {
     alt,
     money: (n) => esc(formatMoney(n, b.currency)),
     wa: (text) => (b.wa ? `https://wa.me/${b.wa}?text=${encodeURIComponent(text)}` : ''),
-    item: (p, project) => ({ s: photo(p.s.name), l: photo(p.l.name), w: p.l.w, h: p.l.h, c: p.caption || '', ch: p.chapterTitle || '', alt: alt(p, project) }),
+    item: (p, project) => ({ s: photo(p.s.name), l: photo(p.l.name), v: (p.v || [p.l]).map((x) => [photo(x.name), x.w]), w: p.l.w, h: p.l.h, c: p.caption || '', ch: p.chapterTitle || '', alt: alt(p, project) }),
   };
 }
 
-function img(h, p, { sizes = '100vw', alt = '', eager = false, large = false, cls = '' } = {}) {
-  const main = large ? p.l : p.s;
-  const srcset = p.s.w < p.l.w ? ` srcset="${esc(`${h.photo(p.s.name)} ${p.s.w}w, ${h.photo(p.l.name)} ${p.l.w}w`)}" sizes="${esc(sizes)}"` : '';
-  const loading = eager ? ' fetchpriority="high"' : ' loading="lazy"';
-  return `<img${cls ? ` class="${cls}"` : ''} src="${esc(h.photo(main.name))}"${srcset} width="${main.w}" height="${main.h}" alt="${esc(alt)}"${loading} decoding="async">`;
+/**
+ * A photo with every web size listed, so each screen downloads only what it needs. Photos that are not
+ * on the first screen show their small version and get the other sizes only when they come near
+ * (see "Photos load as you scroll" in app.js), so a long project page doesn't download everything at once.
+ */
+function img(h, p, { sizes = '100vw', alt = '', eager = false, cls = '', single = false } = {}) {
+  const v = p.v || [p.s, p.l].filter(Boolean);
+  const shape = v[v.length - 1];
+  const set = !single && v.length > 1 ? v.map((x) => `${h.photo(x.name)} ${x.w}w`).join(', ') : '';
+  const src = eager && !single ? v[Math.min(1, v.length - 1)] : v[0];
+  const attrs = eager
+    ? `${set ? ` srcset="${esc(set)}" sizes="${esc(sizes)}"` : ''} fetchpriority="high"`
+    : `${set ? ` data-srcset="${esc(set)}" data-sizes="${esc(sizes)}"` : ''} loading="lazy"`;
+  return `<img${cls ? ` class="${cls}"` : ''} src="${esc(h.photo(src.name))}"${attrs} width="${shape.w}" height="${shape.h}" alt="${esc(alt)}" decoding="async">`;
 }
 
 function waButton(href, label, extra = '') {
@@ -105,7 +117,8 @@ function layout(ctx, h, { page, title, description, path = '', share = '', body,
     `<meta name="description" content="${esc(description)}">`,
     `<meta property="og:type" content="website">`,
     `<meta property="og:site_name" content="${esc(b.name)}">`,
-    `<meta property="og:title" content="${esc(title || b.name)}">`,
+    // WhatsApp shows og:title but not the site name, so the business name is part of it.
+    `<meta property="og:title" content="${esc(docTitle)}">`,
     `<meta property="og:description" content="${esc(description)}">`,
     shareUrl ? `<meta property="og:image" content="${esc(shareUrl)}"><meta property="og:image:width" content="1200"><meta property="og:image:height" content="630"><meta name="twitter:card" content="summary_large_image">` : '',
     url ? `<meta property="og:url" content="${esc(url)}"><link rel="canonical" href="${esc(url)}">` : '',
@@ -177,7 +190,7 @@ function projectBlock(h, p, position) {
   const total = p.allPhotos.length;
   const meta = [p.area, p.days, plural(total, 'photo')].filter(Boolean).map(esc).join(' · ');
   const tiles = p.row
-    .map((photo, k) => `<a class="tile" href="${esc(url)}" data-proj="${esc(p.slug)}" data-i="${photo.index}" data-json="${esc(h.u(`project/${p.slug}/photos.json`))}" data-s="${esc(h.photo(photo.s.name))}" data-l="${esc(h.photo(photo.l.name))}" data-c="${esc(photo.caption)}" data-ch="${esc(photo.chapterTitle)}" data-title="${esc(h.projectName(p))}" aria-label="${esc(`Open photo: ${h.alt(photo, p)}`)}">${img(h, photo, { sizes: TILE_SIZES, eager: position === 0 && k < 3 })}</a>`)
+    .map((photo, k) => `<a class="tile" href="${esc(url)}" data-proj="${esc(p.slug)}" data-i="${photo.index}" data-json="${esc(h.u(`project/${p.slug}/photos.json`))}" data-s="${esc(h.photo(photo.s.name))}" data-l="${esc(h.photo(photo.l.name))}" data-c="${esc(photo.caption)}" data-ch="${esc(photo.chapterTitle)}" data-title="${esc(h.projectName(p))}" aria-label="${esc(`Open photo: ${h.alt(photo, p)}`)}">${img(h, photo, { sizes: TILE_SIZES, eager: position === 0 && k < 3, single: true, alt: h.alt(photo, p) })}</a>`)
     .join('');
   let more = '';
   if (total > 3) {
@@ -242,12 +255,13 @@ ${ctx.projects.length ? '' : '<p class="empty">Photos of our work are coming soo
 
 function tileHtml(h, project, photo, first) {
   const sizes = first ? '(min-width: 1024px) 290px, (min-width: 640px) 33vw, 100vw' : '(min-width: 1024px) 290px, (min-width: 640px) 33vw, 50vw';
-  return `<figure class="ptile"><a href="${esc(h.photo(photo.l.name))}" data-lb="${photo.index}" aria-label="${esc(`Open photo: ${h.alt(photo, project)}`)}">${img(h, photo, { sizes })}${photo.label ? `<span class="ptag">${photo.label}</span>` : ''}</a>${photo.caption ? `<figcaption>${esc(photo.caption)}</figcaption>` : ''}</figure>`;
+  return `<figure class="ptile"><a href="${esc(h.photo(photo.l.name))}" data-lb="${photo.index}" aria-label="${esc(`Open photo: ${h.alt(photo, project)}`)}">${img(h, photo, { sizes, alt: h.alt(photo, project) })}${photo.label ? `<span class="ptag">${photo.label}</span>` : ''}</a>${photo.caption ? `<figcaption>${esc(photo.caption)}</figcaption>` : ''}</figure>`;
 }
 
 function beforeAfterHtml(h, pair) {
   const caption = pair.after.caption || pair.before.caption;
-  return `<figure class="ba" data-ba>
+  // The figure is never wider than the photo can be on this screen, so the slider and the line match.
+  return `<figure class="ba" data-ba style="--ar:${(pair.after.l.w / pair.after.l.h).toFixed(4)}">
 <div class="ba-frame" style="aspect-ratio:${pair.after.l.w} / ${pair.after.l.h}">
 ${img(h, pair.after, { large: true, sizes: BA_SIZES, alt: caption ? `After: ${caption}` : 'After', cls: 'ba-after' })}
 ${img(h, pair.before, { large: true, sizes: BA_SIZES, alt: caption ? `Before: ${caption}` : 'Before', cls: 'ba-before' })}
@@ -383,7 +397,8 @@ ${b.wa ? `<a class="btn wa" id="est-wa" href="${esc(h.wa(`Hi ${b.name}, I'd like
 </section>`
     : '';
 
-  const past = ctx.projects.filter((p) => p.price);
+  // Sample projects show made-up prices, so they are never listed as what past projects cost.
+  const past = ctx.projects.filter((p) => p.price && !p.sample);
   const pastTable = past.length
     ? `<section class="card" aria-labelledby="past-h"><h2 id="past-h">What our past projects cost</h2>
 <div class="table-wrap"><table class="ptable past"><thead><tr><th scope="col">Project</th><th scope="col">Cost</th></tr></thead><tbody>
@@ -397,7 +412,7 @@ ${past.map((p) => `<tr><th scope="row"><a href="${esc(h.u(`project/${p.slug}/`))
 }
 
 function showcaseGrid(h, photos, cls) {
-  return `<div class="${cls}">${photos.map((photo) => `<figure class="mcard"><a href="${esc(h.photo(photo.l.name))}" data-lb="${photo.index}" aria-label="${esc(`Open photo: ${photo.caption || 'photo'}`)}">${img(h, photo, { sizes: '(min-width: 1024px) 280px, (min-width: 640px) 33vw, 50vw' })}</a><figcaption>${photo.title ? `<strong>${esc(photo.title)}</strong>` : ''}${photo.desc ? `<span>${esc(photo.desc)}</span>` : ''}</figcaption></figure>`).join('')}</div>`;
+  return `<div class="${cls}">${photos.map((photo) => `<figure class="mcard"><a href="${esc(h.photo(photo.l.name))}" data-lb="${photo.index}" aria-label="${esc(`Open photo: ${photo.caption || 'photo'}`)}">${img(h, photo, { sizes: '(min-width: 1024px) 280px, (min-width: 640px) 33vw, 50vw', alt: [photo.title, photo.desc].filter(Boolean).join(', ') })}</a><figcaption>${photo.title ? `<strong>${esc(photo.title)}</strong>` : ''}${photo.desc ? `<span>${esc(photo.desc)}</span>` : ''}</figcaption></figure>`).join('')}</div>`;
 }
 
 function materialsPage(ctx, h) {
