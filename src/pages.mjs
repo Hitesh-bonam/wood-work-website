@@ -157,7 +157,7 @@ function layout(ctx, h, { page, title, description, path = '', share = '', body,
   const otherHref = ctx.base + (other === 'en' ? '' : `${other}/`) + (page === '404' ? '' : path);
   // Narrow phones show the short label ("తె" / "EN"), so the business name keeps its room.
   const otherName = other === 'te' ? 'తెలుగు' : 'English';
-  const langLink = `<a class="lang" href="${esc(otherHref)}" hreflang="${other}" lang="${other}" aria-label="${otherName}"><span class="l-long">${otherName}</span><span class="l-short" aria-hidden="true">${other === 'te' ? 'తె' : 'EN'}</span></a>`;
+  const langLink = `<a class="lang" href="${esc(otherHref)}" hreflang="${other}" lang="${other}"><span class="l-long">${otherName}</span><span class="l-short" aria-hidden="true">${other === 'te' ? 'తె' : 'EN'}</span></a>`;
   const topActions = [
     langLink,
     b.tel ? `<a class="btn icon" href="tel:${esc(b.tel)}" aria-label="${esc(t('Call us'))}">${icon('phone')}</a>` : '',

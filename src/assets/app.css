@@ -57,6 +57,8 @@ h1, h2, h3 { font-family: var(--serif); font-weight: 700; line-height: 1.2; marg
 /* Telugu pages: Telugu fonts that come with phones and computers. */
 .lang-te { --font: "Noto Sans Telugu", "Nirmala UI", "Gautami", system-ui, sans-serif; --serif: "Noto Serif Telugu", "Noto Sans Telugu", "Nirmala UI", "Gautami", serif; }
 .lang-te body, body.lang-te { line-height: 1.7; }
+/* Spacing letters apart breaks Telugu letters, so Telugu text keeps normal spacing. */
+.lang-te :is(.hero-k, h1, h2, h3, .sec-title, .foot-parent, .faq-item summary) { letter-spacing: 0; }
 p { margin: 0; }
 button, input, select { font: inherit; }
 .i { width: 20px; height: 20px; flex: none; }
@@ -692,6 +694,9 @@ body:has(.cta-band) .foot { margin-top: 0; }
 .js-reveal .reveal { transform: translateY(18px); transition: transform .7s cubic-bezier(.2, .7, .2, 1); }
 .js-reveal .reveal.shown { transform: none; }
 
+/* Bigger tap areas for small links, without moving anything */
+.foot-contact a, .pj-title a, .crumb a, .back-all a { display: inline-block; padding: 10px 0; margin: -10px 0; }
+
 /* Hover feedback */
 .chap-in a:hover { border-color: var(--wood); color: var(--wood-dark); }
 .tile.more:hover { background: var(--wood-100); }
@@ -711,10 +716,17 @@ body:has(.cta-band) .foot { margin-top: 0; }
   .bn { font-size: 1.2rem; }
 }
 .l-short { display: none; }
-@media (max-width: 479px) {
-  .lang { min-width: 34px; justify-content: center; padding: 0 6px; font-size: 0.9rem; }
-  .l-long { display: none; }
+/* Below laptop size the language button shows just "తె" / "EN", leaving room for the business name. */
+@media (max-width: 1023px) {
+  .lang { position: relative; min-width: 34px; justify-content: center; padding: 0 6px; font-size: 0.9rem; }
+  /* The full name stays for screen readers; the eye sees the short one. */
+  .l-long { position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
   .l-short { display: inline; }
+  /* Telugu menu words are longer, so they sit a little closer together. */
+  .lang-te .nav-desk a { padding-left: 7px; padding-right: 7px; font-size: 0.88rem; }
+}
+@media (max-width: 479px) {
+  .lang-te .tabbar a { font-size: 0.72rem; }
   .top-in { gap: 8px; }
 }
 
@@ -724,6 +736,15 @@ body:has(.cta-band) .foot { margin-top: 0; }
   .brand { gap: 8px; }
   .card { padding: 16px 12px; }
   th, td { padding-left: 4px; padding-right: 4px; }
+}
+
+/* The narrowest phones (320px): every bit of room goes to the business name. */
+@media (max-width: 359px) {
+  .top-in { gap: 6px; }
+  .top-act { gap: 4px; }
+  .lang { min-width: 30px; padding: 0 4px; }
+  .brand { gap: 6px; }
+  .brand img { max-width: 44px; }
 }
 
 /* Tablets and up */

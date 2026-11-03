@@ -614,20 +614,32 @@
 
   /* ---------- Sections appear gently as they come into view ---------- */
   const reveals = $$('.reveal');
-  if (reveals.length && 'IntersectionObserver' in window && !reduceMotion) {
+  if (reveals.length && !reduceMotion) {
     d.documentElement.classList.add('js-reveal');
-    const shower = new IntersectionObserver((entries) => {
-      entries.forEach((entry) => {
-        if (!entry.isIntersecting) return;
-        shower.unobserve(entry.target);
-        entry.target.classList.add('shown');
+    // Checked on every scroll, so sections scrolled past quickly (or jumped over by a link) show too.
+    let waiting = reveals;
+    let queued = false;
+    const check = () => {
+      queued = false;
+      const line = window.innerHeight * 0.94;
+      waiting = waiting.filter((el) => {
+        if (el.getBoundingClientRect().top >= line) return true;
+        el.classList.add('shown');
+        return false;
       });
-    }, { rootMargin: '0px 0px -8% 0px' });
-    reveals.forEach((el) => shower.observe(el));
-    // Anything already on screen, or jumped past, shows at once.
-    requestAnimationFrame(() => reveals.forEach((el) => {
-      if (el.getBoundingClientRect().top < window.innerHeight) el.classList.add('shown');
-    }));
+      if (!waiting.length) {
+        window.removeEventListener('scroll', onScroll);
+        window.removeEventListener('resize', onScroll);
+      }
+    };
+    const onScroll = () => {
+      if (queued) return;
+      queued = true;
+      requestAnimationFrame(check);
+    };
+    window.addEventListener('scroll', onScroll, { passive: true });
+    window.addEventListener('resize', onScroll, { passive: true });
+    onScroll();
   }
 
   /* ---------- Gallery filters ---------- */

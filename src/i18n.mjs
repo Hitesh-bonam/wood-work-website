@@ -10,7 +10,7 @@ const TE = {
   Gallery: 'గ్యాలరీ',
   Pricing: 'ధరలు',
   Materials: 'మెటీరియల్స్',
-  Contact: 'సంప్రదించండి',
+  Contact: 'సంప్రదింపు',
   Main: 'ప్రధాన మెనూ',
   'Main menu': 'ప్రధాన మెనూ',
   'Skip to content': 'కంటెంట్‌కి వెళ్ళండి',

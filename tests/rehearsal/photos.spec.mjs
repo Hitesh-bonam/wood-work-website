@@ -11,7 +11,8 @@ const work = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '.
 test('full-size sideways phone photos show the right way up', async ({ page, request }, testInfo) => {
   test.skip(testInfo.project.name !== 'laptop-1280-chrome', 'runs once');
   const xml = await (await request.get('sitemap.xml')).text();
-  const projects = [...xml.matchAll(/<loc>([^<]+\/project\/[^<]+)<\/loc>/g)].map((m) => m[1]);
+  // English pages only: the Telugu pages show the very same photos.
+  const projects = [...xml.matchAll(/<loc>([^<]+\/project\/[^<]+)<\/loc>/g)].map((m) => m[1]).filter((url) => !url.includes('/te/'));
   let checked = 0;
   for (const url of projects) {
     await page.goto(url);
