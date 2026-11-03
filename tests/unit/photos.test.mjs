@@ -73,13 +73,18 @@ test('a half-copied photo is never overwritten', async () => {
   assert.deepEqual(leftovers, []);
 });
 
-test('web versions are made once, at two sizes, without enlarging small photos', async () => {
+test('web versions are made once, at four widths, without enlarging small photos', async () => {
   const out = path.join(dir, 'out');
   await fs.mkdir(out, { recursive: true });
   const big = await writePhoto(dir, 'web-big.jpg', 'wardrobe', { width: 1800, height: 1200 });
   const r = await processPhoto(big, out);
-  assert.deepEqual([r.s.w, r.s.h], [SMALL, 400]);
+  assert.deepEqual([r.s.w, r.s.h], [SMALL, 267]);
   assert.deepEqual([r.l.w, r.l.h], [LARGE, 1067]);
+  // Every size is made by width, so portrait and landscape photos both get all four.
+  assert.deepEqual(r.v.map((x) => x.w), [400, 800, 1200, 1600]);
+  for (const x of r.v) assert.deepEqual([(await sharp(path.join(out, x.name)).metadata()).width, (await sharp(path.join(out, x.name)).metadata()).height], [x.w, x.h]);
+  const tall = await processPhoto(await writePhoto(dir, 'web-tall.jpg', 'wardrobe', { width: 900, height: 1200 }), out);
+  assert.deepEqual(tall.v.map((x) => [x.w, x.h]), [[400, 533], [800, 1067], [900, 1200]]);
   const stat = await fs.stat(path.join(out, r.l.name));
   const again = await processPhoto(big, out);
   assert.equal(again.l.name, r.l.name);
@@ -87,7 +92,7 @@ test('web versions are made once, at two sizes, without enlarging small photos',
 
   const small = await writePhoto(dir, 'web-small.jpg', 'door', { width: 400, height: 300 });
   const rs = await processPhoto(small, out);
-  assert.deepEqual([rs.s.w, rs.s.h, rs.l.w, rs.l.h], [400, 300, 400, 300]);
+  assert.deepEqual([rs.s.w, rs.s.h, rs.l.w, rs.l.h, rs.v.length], [400, 300, 400, 300, 1]);
   for (const name of [r.s.name, r.l.name]) assert.equal((await sharp(path.join(out, name)).metadata()).format, 'webp');
 
   const share = await makeShareImage(big, out);

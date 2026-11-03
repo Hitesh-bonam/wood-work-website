@@ -4,19 +4,23 @@
 //   node src/clean-photos.mjs --staged  → only photos about to be committed (used by the git hook).
 //                                         Stops the commit if a photo still has hidden data.
 import { execFileSync } from 'node:child_process';
+import { existsSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { cleanPhotoInPlace, hasHiddenData } from './photos.mjs';
 import { PHOTO_EXTS, PROJECTS_DIR, UNSUPPORTED_EXTS, walk } from './util.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+// Inside the save hook, use the same git that is saving (GitHub Desktop brings its own).
+const hookGit = process.env.GIT_EXEC_PATH && [path.join(process.env.GIT_EXEC_PATH, 'git.exe'), path.join(process.env.GIT_EXEC_PATH, 'git')].find((f) => existsSync(f));
+const GIT = hookGit || 'git';
 const staged = process.argv.includes('--staged');
 const inContent = (rel) => rel.toLowerCase().startsWith(`${PROJECTS_DIR}/`) || rel.toLowerCase().startsWith('site/');
 const firstLine = (err) => String(err && err.message ? err.message : err).split('\n')[0];
 
 let files;
 if (staged) {
-  const out = execFileSync('git', ['diff', '--cached', '--name-only', '-z', '--diff-filter=ACMR'], { cwd: root });
+  const out = execFileSync(GIT, ['diff', '--cached', '--name-only', '-z', '--diff-filter=ACMR'], { cwd: root });
   files = out.toString('utf8').split('\0').filter(Boolean).filter(inContent);
 } else {
   files = [...(await walk(path.join(root, PROJECTS_DIR))), ...(await walk(path.join(root, 'site')))].map((f) => path.relative(root, f).split(path.sep).join('/'));
@@ -33,13 +37,25 @@ for (const rel of files) {
   }
   if (!PHOTO_EXTS.has(ext)) continue;
   const file = path.join(root, rel);
+  let readable = true;
   try {
     if (await cleanPhotoInPlace(file)) {
       cleaned++;
-      if (staged) execFileSync('git', ['add', '--', rel], { cwd: root });
+      if (staged) execFileSync(GIT, ['add', '--', rel], { cwd: root });
     }
   } catch (err) {
-    notes.push(`${rel} couldn't be tidied (${firstLine(err)}).`);
+    try {
+      await hasHiddenData(file);
+      notes.push(`${rel} couldn't be tidied (${firstLine(err)}).`);
+    } catch {
+      readable = false;
+    }
+  }
+  if (!readable) {
+    // An empty or damaged file can't be opened or re-saved: it is left out instead of blocking everything else.
+    if (staged) execFileSync(GIT, ['reset', '--quiet', '--', rel], { cwd: root });
+    notes.push(`${rel} is damaged or empty, so it was not uploaded. Delete it, or copy the photo again.`);
+    continue;
   }
   if (staged) {
     let hidden = true;

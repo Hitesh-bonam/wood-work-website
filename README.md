@@ -74,6 +74,12 @@ matter (`Before`, `AFTER` and `Info.txt` all work).
 - **Any photo from your phone works** (JPG, PNG, WebP or JFIF). Photos are automatically turned upright, made smaller for the web
   (a 5 MB phone photo becomes about 200 KB), and **the GPS location is removed** so your clients'
   addresses are never shared.
+- **The copies in `images/` are made smaller** (at most 2000 pixels) the first time PREVIEW or PUBLISH sees
+  them. Keep your full-size originals in your phone's gallery or Google Photos.
+- **Only photos and `info.txt` are uploaded.** Anything else you put in `images/` (PDFs, quotations, notes,
+  videos, ZIP files) stays on your computer and is never made public.
+- **A job still in progress** (only before photos) is not shown yet. It appears as soon as you add photos
+  to its `after` folder.
 - **The file name becomes the caption:** `master-wardrobe-sliding-doors.jpg` shows as
   "Master wardrobe sliding doors". Phone names like `IMG_2041.jpg` are fine; they just show no caption.
 - **Optional slider:** give a before photo and an after photo the **same name** (for example
@@ -95,6 +101,23 @@ matter (`Before`, `AFTER` and `Info.txt` all work).
   (standard / premium). These feed the Pricing page and its estimator.
 - A project's price is optional. If you don't want to show a price, leave it out of `info.txt`
   completely (see "Privacy" below).
+
+### Home page sections, in English and Telugu
+
+The home page has "What we do", "How we work" and "Questions people ask". Their words are in plain
+text files in `site/`. Each English file has a Telugu partner; if a Telugu file is missing, the
+Telugu page shows the English words instead.
+
+| Section | English | Telugu |
+| --- | --- | --- |
+| What we do | `services.txt` (`Service = one short sentence`) | `services-telugu.txt` |
+| How we work | `process.txt` (`Step = one or two sentences`) | `process-telugu.txt` |
+| Questions | `faq.txt` (`Q:` question, then `A:` answer) | `faq-telugu.txt` |
+
+In `business.txt`, `Tagline Telugu`, `About Telugu` and `Warranty Telugu` are the Telugu versions of
+those lines. `Parent company` shows as "A … company" under the name (leave it empty to hide it).
+Everything else on the site (menus, buttons) is translated already. The Telugu website is at the
+same address with `/te/` added; the తెలుగు / EN button at the top switches between them.
 
 ## See the website on your computer
 
@@ -129,8 +152,19 @@ There is only one website and one GitHub repository. Photos added from your phon
 the same `images/` folders on GitHub. PUBLISH.cmd and PREVIEW.cmd bring them down into this folder,
 and PUBLISH.cmd sends your computer's photos up, so both sides always end up with everything.
 
-If the same file was changed on both sides, PUBLISH.cmd stops and names the file. Nothing is lost:
-give one of the photos a different name and run it again.
+If the phone and this computer changed the same thing, nothing is lost and nothing gets stuck:
+- **Same photo name on both:** both photos are kept; yours gets "-pc" added (for example `kitchen-pc.jpg`).
+- **Same `info.txt` changed on both:** your computer's version is kept, and the phone's version is saved
+  next to it as `info (from phone).txt` (it stays on your computer). Copy anything you need from it,
+  then delete it.
+- **A new project made on the phone and on the computer with the same number:** yours moves to the next
+  free number, and PUBLISH tells you which.
+
+PUBLISH.cmd tells you each time it does one of these.
+
+**On a new or second computer:** install GitHub Desktop, clone the repository, then double-click
+`PREVIEW.cmd` once (it sets everything up, including the check that removes GPS locations) before you
+use `PUBLISH.cmd`.
 
 ## Add photos from your phone
 

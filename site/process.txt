@@ -1,0 +1,8 @@
+# "How we work" on the home page, in order. One step per line:   Step = one or two short sentences
+# The Telugu version is in process-telugu.txt.
+
+Free site visit = We visit your home, take measurements and listen to what you need. No charge.
+Design and quote = You get a clear design and a written quotation with the materials and prices.
+Work begins = Our carpenters and painters start on the agreed date, and you can follow the progress.
+Clean, careful work = We keep your home tidy and clean up the site every day.
+Handover = We check every detail with you and hand over your finished home, with a 2-year warranty on woodwork.

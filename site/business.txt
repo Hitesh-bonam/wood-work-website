@@ -1,26 +1,31 @@
 # Your business details. Change the text after each colon, then save the file.
 # Lines starting with # are notes for you and are not shown on the website.
 
-Business name: Your Woodworks
-Tagline: Woodwork, painting and repairs, done right
+Business name: Deva Deva Interio
+# Shown in small text as "A Deva Deva Infratech company" (leave empty to hide).
+Parent company: Deva Deva Infratech
+Tagline: Interior woodwork, false ceilings and painting across Hyderabad
+Tagline Telugu: హైదరాబాద్ అంతటా ఇంటీరియర్ వుడ్‌వర్క్, ఫాల్స్ సీలింగ్, పెయింటింగ్
 
 # Write numbers with the country code (91 is India).
 Phone: +91 99124 46611
 WhatsApp: 91 99124 46611
-Email:
+Email: hitesh.bonam@gmail.com
 
-City: Your City
-Areas: Green Park, Lake Road, Hill View, River Side
-Hours: Mon to Sat, 9 am to 7 pm. Sunday by appointment.
+City: Hyderabad
+Areas: All of Hyderabad
+Hours: Open all 7 days
 # Paste a Google Maps link, or just write your address.
 Map:
 
 # Change these to your real numbers (leave empty to hide them).
-Years: 12
-Homes done: 180+
-Warranty: 5-year warranty on woodwork
+Years: 4+
+Homes done: 20+
+Warranty: 2-year warranty on woodwork
+Warranty Telugu: వుడ్‌వర్క్‌పై 2 సంవత్సరాల వారంటీ
 
-About: We are a family-run team of carpenters and painters. We build and finish everything ourselves, so the quality stays the same from the first board to the last coat of paint.
+About: A Hyderabad team for complete home interiors: woodwork, false ceilings and painting. We take care of your home from the first measurement to the final coat of paint, and hand it over clean.
+About Telugu: పూర్తి ఇంటి ఇంటీరియర్స్ కోసం హైదరాబాద్ టీమ్: వుడ్‌వర్క్, ఫాల్స్ సీలింగ్, పెయింటింగ్. మొదటి కొలత నుంచి చివరి కోటు పెయింట్ వరకు మీ ఇంటిని చూసుకుని, శుభ్రంగా అప్పగిస్తాం.
 
 # Optional links (leave empty to hide).
 Instagram:

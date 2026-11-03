@@ -1,0 +1,7 @@
+# What you do, shown on the home page. One service per line:   Service = one short sentence
+# The Telugu version is in services-telugu.txt.
+
+Modular kitchens and woodwork = Kitchens, wardrobes, TV units, pooja units, beds and storage, made to measure.
+False ceilings = Gypsum ceilings with lighting, and PVC ceilings for balconies.
+Painting = Interior and exterior painting with a clean, even finish.
+Cladding and glass = Wood and tile cladding, glass partitions and fittings.

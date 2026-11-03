@@ -214,10 +214,15 @@ const CAPS = new Map(['tv', 'led', 'bwp', 'bwr', 'mr', 'mdf', 'hdf', 'pvc', 'wpc
   .map((w) => [w, w.toUpperCase()]).concat([['upvc', 'uPVC']]));
 
 /** "01-master-wardrobe-sliding-doors.jpg" → "Master wardrobe sliding doors". Camera names → "". */
+const QUANTITY_WORDS = /^(mm|cm|m|ft|feet|foot|inch|in|sq|sqft|sft|bhk|seater|door|layer|coat|piece|pc|pcs|nos|no|x)$/i;
+
 export function captionFromFilename(fileName) {
   const base = path.parse(fileName).name;
   if (isCameraName(base)) return '';
+  // "01-kitchen", "1. kitchen" and "1 kitchen" all show as "Kitchen" (the number only sets the order).
+  // A number that counts or measures stays: "2 wardrobes", "2 mm edge banding", "3 BHK hall".
   let s = base.replace(/^\s*\d+\s*[-_.)]\s*/, '').replace(/^0\d*\s+/, '');
+  if (s === base) s = s.replace(/^\d{1,3}\s+(?=([\p{L}]+))/u, (all, word) => (/s$/i.test(word) || QUANTITY_WORDS.test(word) ? all : ''));
   s = s.includes(' ') ? s.replace(/_+/g, ' ') : s.replace(/[-_]+/g, ' ');
   s = s.replace(/\s+/g, ' ').trim();
   if (!s || !/\p{L}/u.test(s)) return '';

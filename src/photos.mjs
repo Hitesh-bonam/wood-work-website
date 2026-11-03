@@ -9,9 +9,11 @@ import { sleep } from './util.mjs';
 sharp.cache(false);
 
 /** Bump when the output settings change, so every photo is made again. */
-const VERSION = 'v1';
-export const SMALL = 600;
-export const LARGE = 1600;
+const VERSION = 'v2';
+/** Web versions of each photo, by width: phones, tablets and laptops each pick the one they need. */
+export const WIDTHS = [400, 800, 1200, 1600];
+export const SMALL = WIDTHS[0];
+export const LARGE = WIDTHS[WIDTHS.length - 1];
 /** Originals in images/ are shrunk to this size so the GitHub repository stays small. */
 export const SOURCE_MAX = 2000;
 
@@ -116,33 +118,30 @@ function hashOf(buffer, salt) {
 }
 
 /**
- * Makes the two web versions of a photo (600 px and 1600 px WebP) in outDir.
- * Files are named after the photo's content, so unchanged photos are never made twice.
+ * Makes the web versions of a photo (400, 800, 1200 and 1600 px wide WebP; never wider than the photo
+ * itself) in outDir. Files are named after the photo's content, so unchanged photos are never made twice.
+ * Returns { hash, v: [{ name, w, h }] from small to large, s: smallest, l: largest }.
  */
 export async function processPhoto(file, outDir) {
   const buffer = await fs.readFile(file);
   const hash = hashOf(buffer, 'photo');
-  const names = { s: `${hash}-${SMALL}.webp`, l: `${hash}-${LARGE}.webp` };
-  const missing = [];
-  for (const key of ['s', 'l']) {
-    if (!(await exists(path.join(outDir, names[key])))) missing.push(key);
-  }
-  if (missing.length) {
-    const source = sharp(buffer, { failOn: 'error' }).rotate();
-    for (const key of missing) {
-      const size = key === 's' ? SMALL : LARGE;
-      await writeAtomic(
-        path.join(outDir, names[key]),
-        source.clone().resize({ width: size, height: size, fit: 'inside', withoutEnlargement: true }).webp({ quality: key === 's' ? 72 : 80 }),
-      );
+  const meta = await sharp(buffer, { failOn: 'error' }).metadata();
+  const sideways = (meta.orientation || 1) >= 5;
+  const width = sideways ? meta.height : meta.width;
+  const height = sideways ? meta.width : meta.height;
+  const widths = [...new Set([...WIDTHS.filter((w) => w < width), Math.min(width, LARGE)])];
+  let source = null;
+  const v = [];
+  for (const w of widths) {
+    const name = `${hash}-${w}.webp`;
+    const dest = path.join(outDir, name);
+    if (!(await exists(dest))) {
+      source = source || sharp(buffer, { failOn: 'error' }).rotate();
+      await writeAtomic(dest, source.clone().resize({ width: w, withoutEnlargement: true }).webp({ quality: w <= 400 ? 70 : w <= 800 ? 76 : 80 }));
     }
+    v.push({ name, w, h: Math.max(1, Math.round((height * w) / width)) });
   }
-  const result = { hash };
-  for (const key of ['s', 'l']) {
-    const meta = await sharp(path.join(outDir, names[key])).metadata();
-    result[key] = { name: names[key], w: meta.width, h: meta.height };
-  }
-  return result;
+  return { hash, v, s: v[0], l: v[v.length - 1] };
 }
 
 /** 1200×630 picture used when a link is shared on WhatsApp, Facebook and so on. */

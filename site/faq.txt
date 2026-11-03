@@ -1,0 +1,26 @@
+# Questions customers ask, shown on the home page. Write each question after "Q:" and its answer
+# after "A:" on the next line. The Telugu version is in faq-telugu.txt.
+
+Q: Is the site visit free?
+A: Yes. We visit your home, take measurements and give you a quotation, free of charge.
+
+Q: How long does the work take?
+A: Woodwork for a full home takes about 3 months, plus time for false ceiling and painting if you need them. You get a timeline with your quotation.
+
+Q: How do payments work?
+A: 40% advance when the work starts, 40% midway, and the last 20% on handover.
+
+Q: What materials do you use?
+A: Quality branded plywood, laminates and hardware, chosen to fit your budget. We show you the options before work begins.
+
+Q: Is there a warranty?
+A: Yes. You get a 2-year warranty on all woodwork.
+
+Q: Which areas do you work in?
+A: All of Hyderabad.
+
+Q: How much will my home cost?
+A: See our rates on the Pricing page for a rough idea. You get an exact quotation after the free site visit.
+
+Q: Do you work on weekends?
+A: Yes, we work all 7 days of the week.

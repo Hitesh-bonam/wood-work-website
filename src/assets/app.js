@@ -17,6 +17,9 @@
       return null;
     }
   };
+  // On Telugu pages the page sends its own words for the viewer, story and estimator (see src/i18n.mjs).
+  const WORDS = readJson('i18n') || {};
+  const tr = (text, vars = {}) => String(WORDS[text] ?? text).replace(/\{(\w+)\}/g, (all, key) => (key in vars ? vars[key] : all));
   const svg = (paths) => `<svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">${paths}</svg>`;
   const ICON = {
     x: svg('<path d="M6 6l12 12M18 6 6 18"/>'),
@@ -33,6 +36,37 @@
   $$('[data-js-only]').forEach((el) => {
     el.hidden = false;
   });
+
+  /* Photos load as you scroll: a photo gets its sharper sizes about one screen before it is reached, so
+     a long project page on a phone doesn't download every big photo at once. */
+  const sharpen = (im) => {
+    if (!im.dataset.srcset) return;
+    im.sizes = im.dataset.sizes || '100vw';
+    im.srcset = im.dataset.srcset;
+    im.removeAttribute('data-srcset');
+  };
+  const later = $$('img[data-srcset]');
+  if (later.length && 'IntersectionObserver' in window) {
+    const watcher = new IntersectionObserver((entries) => {
+      entries.forEach((entry) => {
+        if (!entry.isIntersecting) return;
+        watcher.unobserve(entry.target);
+        sharpen(entry.target);
+      });
+    }, { rootMargin: '100% 0px' });
+    later.forEach((im) => watcher.observe(im));
+  } else {
+    later.forEach(sharpen);
+  }
+
+  /** The photo file that fills this screen sharply: no bigger than needed, never blurry. */
+  const fitting = (p) => {
+    if (!p || !Array.isArray(p.v) || !p.v.length) return p && (p.l || p.s);
+    const ratio = p.w && p.h ? p.w / p.h : 1;
+    const need = Math.min(window.innerWidth, window.innerHeight * ratio) * (window.devicePixelRatio || 1);
+    const pick = p.v.find(([, w]) => w >= need * 0.9) || p.v[p.v.length - 1];
+    return pick[0];
+  };
 
   const canDialog = typeof HTMLDialogElement === 'function' && typeof HTMLDialogElement.prototype.showModal === 'function';
 
@@ -197,8 +231,8 @@
 
   /* ---------- Photo viewer ---------- */
   function createViewer() {
-    const box = makeDialog('viewer', 'Photo viewer', `<div class="v-bar"><p class="v-title" aria-live="polite"></p><button type="button" class="v-btn v-close" aria-label="Close">${ICON.x}</button></div>
-<div class="v-stage"><img class="v-img" alt="" draggable="false"><button type="button" class="v-btn v-prev" aria-label="Previous photo">${ICON.left}</button><button type="button" class="v-btn v-next" aria-label="Next photo">${ICON.right}</button></div>
+    const box = makeDialog('viewer', tr('Photo viewer'), `<div class="v-bar"><p class="v-title" aria-live="polite"></p><button type="button" class="v-btn v-close" aria-label="${escHtml(tr('Close'))}">${ICON.x}</button></div>
+<div class="v-stage"><img class="v-img" alt="" draggable="false"><button type="button" class="v-btn v-prev" aria-label="${escHtml(tr('Previous photo'))}">${ICON.left}</button><button type="button" class="v-btn v-next" aria-label="${escHtml(tr('Next photo'))}">${ICON.right}</button></div>
 <div class="v-foot"><p class="v-cap"></p><a class="v-link" hidden></a></div>`);
     const { dlg } = box;
     const title = $('.v-title', dlg);
@@ -214,14 +248,26 @@
       const p = state.list[state.i];
       if (!p) return;
       const token = ++state.token;
-      img.alt = p.alt || p.c || 'Photo';
+      img.alt = p.alt || p.c || tr('Photo');
       img.src = p.s || p.l;
-      if (p.l && p.l !== p.s) {
+      const n2 = state.list.length;
+      // The photos next to this one start loading only once this one is sharp, so it isn't slowed down.
+      const neighbours = () => {
+        if (n2 < 2 || token !== state.token) return;
+        const q = state.list[(state.i + 1) % n2];
+        if (q && q !== p) new Image().src = fitting(q);
+      };
+      const want = fitting(p);
+      if (want && want !== p.s) {
         const big = new Image();
         big.onload = () => {
-          if (token === state.token && dlg.open) img.src = p.l;
+          if (token === state.token && dlg.open) img.src = want;
+          neighbours();
         };
-        big.src = p.l;
+        big.onerror = neighbours;
+        big.src = want;
+      } else {
+        neighbours();
       }
       title.textContent = n > 1 ? `${state.name ? `${state.name} · ` : ''}${state.i + 1} / ${n}` : state.name;
       cap.textContent = '';
@@ -234,12 +280,6 @@
       if (p.c) cap.appendChild(d.createTextNode(p.c));
       prev.hidden = n < 2;
       next.hidden = n < 2;
-      if (n > 1) {
-        [state.i + 1, state.i - 1].forEach((k) => {
-          const q = state.list[(k + n) % n];
-          if (q && q !== p) new Image().src = q.l || q.s;
-        });
-      }
     }
     function show(i) {
       const n = state.list.length;
@@ -328,7 +368,7 @@
       const quick = { s: tile.dataset.s, l: tile.dataset.l, c: tile.dataset.c, ch: tile.dataset.ch, alt: (tile.getAttribute('aria-label') || '').replace(/^Open photo: /, '') };
       const wanted = Number(tile.dataset.i) || 0;
       const quickList = [quick];
-      viewer.open(quickList, 0, { name: tile.dataset.title || '', opener: tile, link: { href: tile.getAttribute('href'), text: 'See the full project' } });
+      viewer.open(quickList, 0, { name: tile.dataset.title || '', opener: tile, link: { href: tile.getAttribute('href'), text: tr('See the full project') } });
       loadList(tile.dataset.json)
         .then((list) => {
           if (Array.isArray(list) && list.length && viewer.isOpen() && viewer.current() === quickList) viewer.replaceList(list, Math.min(wanted, list.length - 1));
@@ -348,14 +388,14 @@
     const DURATION = 4000;
     const ds = button.dataset;
     const endButtons = [
-      ds.wa ? `<a class="btn wa" href="${escHtml(ds.wa)}">${ICON.wa}<span>Get a quote on WhatsApp</span></a>` : ds.tel ? `<a class="btn wa" href="${escHtml(ds.tel)}">${ICON.phone}<span>Call us</span></a>` : '',
-      ds.price ? `<a class="btn s-price" href="${escHtml(ds.price)}">${ICON.tag}<span>See the price</span></a>` : '',
-      ds.next ? `<a class="btn s-next-project" href="${escHtml(ds.next)}"><span>Next: ${escHtml(ds.nextLabel || 'project')}</span>${ICON.arrow}</a>` : '',
+      ds.wa ? `<a class="btn wa" href="${escHtml(ds.wa)}">${ICON.wa}<span>${escHtml(tr('Get a quote on WhatsApp'))}</span></a>` : ds.tel ? `<a class="btn wa" href="${escHtml(ds.tel)}">${ICON.phone}<span>${escHtml(tr('Call us'))}</span></a>` : '',
+      ds.price ? `<a class="btn s-price" href="${escHtml(ds.price)}">${ICON.tag}<span>${escHtml(tr('See the price'))}</span></a>` : '',
+      ds.next ? `<a class="btn s-next-project" href="${escHtml(ds.next)}"><span>${escHtml(tr('Next: {x}', { x: ds.nextLabel || tr('project') }))}</span>${ICON.arrow}</a>` : '',
     ].join('');
-    const box = makeDialog('viewer story', 'Project story', `<div class="s-bars">${list.map(() => '<span class="s-bar"><i></i></span>').join('')}</div>
-<div class="v-bar"><p class="v-title"></p><button type="button" class="v-btn s-pp" aria-label="Pause">${ICON.pause}</button><button type="button" class="v-btn v-close" aria-label="Close story">${ICON.x}</button></div>
-<div class="v-stage s-stage"><img class="v-img" alt="" draggable="false"><div class="s-cap"><span class="v-ch"></span><p class="v-cap"></p></div><button type="button" class="s-zone s-prev" aria-label="Previous photo"></button><button type="button" class="s-zone s-next" aria-label="Next photo"></button></div>
-<div class="s-end" hidden><h2>Like this project?</h2><p>${escHtml(ds.title || '')}</p>${endButtons}<button type="button" class="btn s-replay">Watch again</button></div>`);
+    const box = makeDialog('viewer story', tr('Project story'), `<div class="s-bars">${list.map(() => '<span class="s-bar"><i></i></span>').join('')}</div>
+<div class="v-bar"><p class="v-title"></p><button type="button" class="v-btn s-pp" aria-label="${escHtml(tr('Pause'))}">${ICON.pause}</button><button type="button" class="v-btn v-close" aria-label="${escHtml(tr('Close story'))}">${ICON.x}</button></div>
+<div class="v-stage s-stage"><img class="v-img" alt="" draggable="false"><div class="s-cap"><span class="v-ch"></span><p class="v-cap"></p></div><button type="button" class="s-zone s-prev" aria-label="${escHtml(tr('Previous photo'))}"></button><button type="button" class="s-zone s-next" aria-label="${escHtml(tr('Next photo'))}"></button></div>
+<div class="s-end" hidden><h2>${escHtml(tr('Like this project?'))}</h2><p>${escHtml(ds.title || '')}</p>${endButtons}<button type="button" class="btn s-replay">${escHtml(tr('Watch again'))}</button></div>`);
     const { dlg } = box;
     const bars = $$('.s-bar i', dlg);
     const img = $('.v-img', dlg);
@@ -407,17 +447,18 @@
       chapter.textContent = p.ch || '';
       caption.textContent = p.c || '';
       const pic = new Image();
+      // The next photo starts loading once this one is ready, so this one isn't slowed down.
+      const after = list[i + 1];
       pic.onload = () => {
         if (t !== token) return;
         img.src = pic.src;
         ready = true;
+        if (after) new Image().src = fitting(after);
       };
       pic.onerror = () => {
         if (t === token) ready = true;
       };
-      pic.src = p.l || p.s;
-      const after = list[i + 1];
-      if (after) new Image().src = after.l || after.s;
+      pic.src = fitting(p);
       paintBars();
     }
     function tick(now) {
@@ -432,7 +473,7 @@
     function setPaused(value) {
       paused = value;
       pp.innerHTML = value ? ICON.play : ICON.pause;
-      pp.setAttribute('aria-label', value ? 'Play' : 'Pause');
+      pp.setAttribute('aria-label', value ? tr('Play') : tr('Pause'));
     }
     function open() {
       opener = button;
@@ -571,6 +612,36 @@
     window.addEventListener('pointercancel', stop);
   });
 
+  /* ---------- Sections appear gently as they come into view ---------- */
+  const reveals = $$('.reveal');
+  if (reveals.length && !reduceMotion) {
+    d.documentElement.classList.add('js-reveal');
+    // Checked on every scroll, so sections scrolled past quickly (or jumped over by a link) show too.
+    let waiting = reveals;
+    let queued = false;
+    const check = () => {
+      queued = false;
+      const line = window.innerHeight * 0.94;
+      waiting = waiting.filter((el) => {
+        if (el.getBoundingClientRect().top >= line) return true;
+        el.classList.add('shown');
+        return false;
+      });
+      if (!waiting.length) {
+        window.removeEventListener('scroll', onScroll);
+        window.removeEventListener('resize', onScroll);
+      }
+    };
+    const onScroll = () => {
+      if (queued) return;
+      queued = true;
+      requestAnimationFrame(check);
+    };
+    window.addEventListener('scroll', onScroll, { passive: true });
+    window.addEventListener('resize', onScroll, { passive: true });
+    onScroll();
+  }
+
   /* ---------- Gallery filters ---------- */
   const filters = $('[data-filters]');
   if (filters) {
@@ -588,6 +659,8 @@
         if (match) shown++;
       });
       if (none) none.hidden = shown > 0;
+      const count = $('[data-count]');
+      if (count && count.dataset.of) count.textContent = count.dataset.of.replace('{n}', String(shown));
     });
   }
 
@@ -753,10 +826,10 @@
         if (premium.disabled && premium.checked && standard) standard.checked = true;
       }
       const usePremium = Boolean(premium && premium.checked && service.prem != null);
-      label.textContent = `How many ${service.unit}?`;
+      label.textContent = tr('How many {unit}?', { unit: service.unit });
       const raw = qty.value.trim();
       const amount = Number(raw);
-      let text = 'Enter a size to see an estimate';
+      let text = tr('Enter a size to see an estimate');
       let ok = false;
       if (qty.validity && qty.validity.badInput) {
         showError(true);
@@ -775,7 +848,7 @@
       if (wa && form.dataset.waBase) {
         const name = form.dataset.name || '';
         const message = ok
-          ? `Hi ${name}, I used the estimator on your website: ${service.name}, ${amount} ${service.unit}, ${usePremium ? 'premium' : 'standard'} finish, about ${text}. Can you visit and give me a quote?`
+          ? `Hi ${name}, I used the estimator on your website: ${service.name}, ${amount} ${service.unit}, ${radios.length ? `${usePremium ? 'premium' : 'standard'} finish, ` : ''}about ${text}. Can you visit and give me a quote?`
           : `Hi ${name}, I'd like an estimate for ${service.name.toLowerCase()} for my home.`;
         wa.href = form.dataset.waBase + encodeURIComponent(message);
       }

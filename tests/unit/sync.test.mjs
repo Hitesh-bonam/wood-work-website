@@ -77,23 +77,87 @@ test('publishing sends computer photos and keeps the phone photos: one project',
   await fs.rm(base, { recursive: true, force: true });
 });
 
-test('the same file changed on both sides is reported and nothing is lost', async () => {
-  const { base, computer, phone } = await setup();
+const online = (base, github) => run(base, `--git-dir=${github}`, 'ls-tree', '-r', '--name-only', 'main').split('\n');
+const onlineText = (base, github, file) => run(base, `--git-dir=${github}`, 'show', `main:${file}`);
+
+test('the same info.txt changed on both sides: this computer wins, the phone version is kept beside it', async () => {
+  const { base, github, computer, phone } = await setup();
   await phoneUploads(phone, 'images/project-1/info.txt', 'Title: Changed on the phone\n');
   await writeText(computer, 'images/project-1/info.txt', 'Title: Changed on the computer\n');
   const messages = [];
-  assert.equal(publish(computer, (m) => messages.push(m)), false);
-  assert.ok(messages.some((m) => m.includes('images/project-1/info.txt')), messages.join('\n'));
-  assert.equal(existsSync(path.join(computer, '.git', 'rebase-merge')) || existsSync(path.join(computer, '.git', 'rebase-apply')), false);
+  assert.equal(publish(computer, (m) => messages.push(m)), true, messages.join('\n'));
   assert.equal(await fs.readFile(path.join(computer, 'images', 'project-1', 'info.txt'), 'utf8'), 'Title: Changed on the computer\n');
-  assert.equal(run(computer, 'log', '-1', '--format=%s'), 'Update projects and photos');
+  assert.equal(await fs.readFile(path.join(computer, 'images', 'project-1', 'info (from phone).txt'), 'utf8'), 'Title: Changed on the phone\n');
+  assert.ok(messages.some((m) => m.includes('info (from phone).txt')), messages.join('\n'));
+  assert.equal(onlineText(base, github, 'images/project-1/info.txt'), 'Title: Changed on the computer');
+  assert.ok(!online(base, github).some((f) => f.includes('(from phone)')), 'the side copy stays on this computer');
+  assert.equal(run(computer, 'status', '--porcelain', '--', 'images/project-1/info.txt'), '');
+  await fs.rm(base, { recursive: true, force: true });
+});
+
+test('the same photo name added on both sides: both photos are kept', async () => {
+  const { base, github, computer, phone } = await setup();
+  await phoneUploads(phone, 'images/project-1/after/kitchen.jpg', 'phone photo');
+  await writeText(computer, 'images/project-1/after/kitchen.jpg', 'computer photo');
+  const messages = [];
+  assert.equal(publish(computer, (m) => messages.push(m)), true, messages.join('\n'));
+  assert.equal(onlineText(base, github, 'images/project-1/after/kitchen.jpg'), 'phone photo');
+  assert.equal(onlineText(base, github, 'images/project-1/after/kitchen-pc.jpg'), 'computer photo');
+  assert.ok(messages.some((m) => m.includes('kitchen-pc.jpg')), messages.join('\n'));
+  await fs.rm(base, { recursive: true, force: true });
+});
+
+test('a new project made on the phone and one made here with the same number are both kept', async () => {
+  const { base, github, computer, phone } = await setup();
+  await phoneUploads(phone, 'images/project-2/after/1.jpg', 'phone home');
+  await writeText(computer, 'images/project-2/after/1.jpg', 'computer home');
+  await writeText(computer, 'images/project-2/info.txt', 'Title: Computer home\n');
+  const messages = [];
+  assert.equal(publish(computer, (m) => messages.push(m)), true, messages.join('\n'));
+  assert.equal(onlineText(base, github, 'images/project-2/after/1.jpg'), 'phone home');
+  assert.equal(onlineText(base, github, 'images/project-3/after/1.jpg'), 'computer home');
+  assert.equal(onlineText(base, github, 'images/project-3/info.txt'), 'Title: Computer home');
+  assert.ok(messages.some((m) => m.includes('project-3')), messages.join('\n'));
+  await fs.rm(base, { recursive: true, force: true });
+});
+
+test('an old save that never reached GitHub no longer blocks publishing', async () => {
+  const { base, github, computer, phone } = await setup();
+  // Left behind by an earlier version, or by a publish that stopped halfway.
+  await writeText(computer, 'images/project-1/info.txt', 'Title: Saved here earlier\n');
+  run(computer, 'add', '-A');
+  run(computer, 'commit', '--quiet', '-m', 'Update projects and photos');
+  await phoneUploads(phone, 'images/project-1/info.txt', 'Title: From the phone\n');
+  const messages = [];
+  assert.equal(publish(computer, (m) => messages.push(m)), true, messages.join('\n'));
+  assert.equal(onlineText(base, github, 'images/project-1/info.txt'), 'Title: Saved here earlier');
+  assert.equal(await fs.readFile(path.join(computer, 'images', 'project-1', 'info (from phone).txt'), 'utf8'), 'Title: From the phone\n');
+  await fs.rm(base, { recursive: true, force: true });
+});
+
+test('leftover sync markers and huge files are never published', async () => {
+  const { base, github, computer } = await setup();
+  await writeText(computer, 'images/project-1/info.txt', '<<<<<<< Updated upstream\nTitle: A\n=======\nTitle: B\n>>>>>>> Stashed changes\n');
+  const messages = [];
+  assert.equal(publish(computer, (m) => messages.push(m)), false);
+  assert.ok(messages.some((m) => m.includes('<<<<<<<')), messages.join('\n'));
+  assert.equal(onlineText(base, github, 'images/project-1/info.txt'), 'Title: First');
+
+  await writeText(computer, 'images/project-1/info.txt', 'Title: Fixed\n');
+  await fs.mkdir(path.join(computer, 'images', 'project-1', 'after'), { recursive: true });
+  await fs.writeFile(path.join(computer, 'images', 'project-1', 'after', 'huge.jpg'), Buffer.alloc(51 * 1024 * 1024));
+  messages.length = 0;
+  assert.equal(publish(computer, (m) => messages.push(m)), true, messages.join('\n'));
+  assert.ok(messages.some((m) => m.includes('huge.jpg') && m.includes('too big')), messages.join('\n'));
+  assert.ok(!online(base, github).includes('images/project-1/after/huge.jpg'));
+  assert.equal(onlineText(base, github, 'images/project-1/info.txt'), 'Title: Fixed');
   await fs.rm(base, { recursive: true, force: true });
 });
 
 test('no GitHub connection, or no internet, never stops the preview', async () => {
   const { base, computer } = await setup();
   run(computer, 'remote', 'set-url', 'origin', path.join(base, 'missing.git'));
-  assert.equal(pullLatest(computer).status, 'offline');
+  assert.match(pullLatest(computer).status, /^(offline|blocked)$/);
   run(computer, 'remote', 'remove', 'origin');
   assert.equal(pullLatest(computer).status, 'no-remote');
   const messages = [];

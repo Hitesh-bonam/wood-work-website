@@ -8,29 +8,49 @@ tests/.tmp/
 tests/.last-run.txt
 tests/.rehearsal-run.txt
 
-# Files the website can't use are never uploaded: videos go on YouTube, and iPhone HEIC photos
-# must be saved as JPG first. The preview window tells you about any it finds.
-images/**/*.mp4
-images/**/*.MP4
-images/**/*.mov
-images/**/*.MOV
-images/**/*.avi
-images/**/*.AVI
-images/**/*.mkv
-images/**/*.3gp
-images/**/*.webm
-images/**/*.m4v
-images/**/*.wmv
-images/**/*.heic
-images/**/*.HEIC
-images/**/*.heif
-images/**/*.HEIF
-site/**/*.mp4
-site/**/*.MP4
-site/**/*.mov
-site/**/*.MOV
-site/**/*.heic
-site/**/*.HEIC
+# Only photos and the owner's text files go up from images/ and site/. Anything else there (videos,
+# HEIC, PDFs, quotations, client notes, ZIPs...) stays on this computer and is never made public.
+# The preview window tells you about any file it can't show.
+images/**
+site/**
+!images/**/
+!site/**/
+!images/**/*.jpg
+!images/**/*.JPG
+!images/**/*.jpeg
+!images/**/*.JPEG
+!images/**/*.jfif
+!images/**/*.JFIF
+!images/**/*.jpe
+!images/**/*.JPE
+!images/**/*.png
+!images/**/*.PNG
+!images/**/*.webp
+!images/**/*.WEBP
+!site/**/*.jpg
+!site/**/*.JPG
+!site/**/*.jpeg
+!site/**/*.JPEG
+!site/**/*.jfif
+!site/**/*.JFIF
+!site/**/*.jpe
+!site/**/*.JPE
+!site/**/*.png
+!site/**/*.PNG
+!site/**/*.webp
+!site/**/*.WEBP
+!images/**/info.txt
+!images/**/Info.txt
+!images/**/INFO.txt
+!images/**/info.TXT
+!images/HOW TO ADD PHOTOS.txt
+!images/**/.gitkeep
+!site/*.txt
+!site/logo.svg
+!site/logo.SVG
+# Side copies kept by PUBLISH when the phone changed the same file are for the owner only.
+images/**/*(from phone)*
+site/**/*(from phone)*
 Thumbs.db
 desktop.ini
 .DS_Store
